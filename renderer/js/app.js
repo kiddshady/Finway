@@ -17,6 +17,7 @@ import { monthTotals } from './fin/stats.js';
 import { loadAll, refresh, S, setOnChrome, setOnSaved } from './fin/state.js';
 import { focusCarga, viewMovimientos, viewResumen } from './fin/views.js';
 import { viewAjustes } from './fin/ajustes.js';
+import { cargarCalculadora, viewCalculadora } from './fin/calculadora.js';
 
 /* El shell es del framework: `window.onyx` significa lo mismo en todas las
    apps de Onyx. El dominio de esta vive en `window.fw` y lo usan los módulos
@@ -25,13 +26,15 @@ const shell = window.onyx;
 
 /* ══ Íconos del dominio ══════════════════════════════════════════════════════
    Con Icons.add(), no editando icons.js: así una versión nueva del set base de
-   Onyx se copia encima sin pisar estos dos. Misma receta que el resto —
+   Onyx se copia encima sin pisar los de acá. Misma receta que el resto —
    viewBox de 16, contenido entre 1.8 y 14.2, sin fill. */
 
 Icons.add({
   chart: '<path d="M2.4 13.6h11.2"/><path d="M5 13.6V8.2"/><path d="M8 13.6V3.8"/><path d="M11 13.6V10"/>',
   scale: '<path d="M8 3.2v10.4"/><path d="M3.6 5.4h8.8"/><path d="M3.6 5.4 2 9.4h3.2z"/>'
        + '<path d="M12.4 5.4 10.8 9.4H14z"/><path d="M5.8 13.6h4.4"/>',
+  calc: '<rect x="3.2" y="1.8" width="9.6" height="12.4" rx="1.8"/><path d="M5.6 4.8h4.8"/>'
+      + '<path d="M5.6 8.2h.4M7.8 8.2h.4M10 8.2h.4M5.6 11.2h.4M7.8 11.2h.4M10 11.2h.4"/>',
 });
 
 /* ══ Router ══════════════════════════════════════════════════════════════════ */
@@ -39,6 +42,7 @@ Icons.add({
 Router.define({
   resumen: { view: viewResumen },
   movimientos: { view: viewMovimientos },
+  calculadora: { view: viewCalculadora },
   ajustes: { view: viewAjustes },
 }, document.getElementById('view'));
 
@@ -136,7 +140,7 @@ async function boot() {
   setOnChrome(updateChrome);
 
   try {
-    await loadAll();
+    await Promise.all([loadAll(), cargarCalculadora()]);
   } catch (err) {
     // Si los datos no cargan, la app tiene que DECIRLO. Una pantalla vacía sin
     // explicación es peor que un error feo.

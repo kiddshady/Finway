@@ -528,3 +528,61 @@
 
 /* ── Estado vacío de la lista ───────────────────────────────────────────── */
 .fw-empty-mark { opacity: .35 }
+
+/* ══ Calculadora ═════════════════════════════════════════════════════════════
+   Una planilla de dos columnas y un total. Los montos van en mono y alineados
+   a la derecha, como en cualquier columna de números: así las cifras quedan
+   una debajo de la otra y se comparan de un vistazo. */
+.fw-calc { max-width: 620px; }
+.fw-calc__cols,
+.fw-calc__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px 22px;
+  align-items: center;
+  gap: var(--ox-2);
+}
+.fw-calc__cols { padding: var(--ox-3) var(--ox-4) var(--ox-1); }
+.fw-calc__cols-monto { text-align: right; }
+.fw-calc__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ox-1);
+  padding: 0 var(--ox-4);
+}
+.fw-calc__monto { position: relative; display: flex; align-items: center; }
+.fw-calc__currency {
+  position: absolute;
+  left: var(--ox-3);
+  color: var(--ox-text-4);
+  font-size: var(--ox-fs-12);
+  pointer-events: none;
+}
+.fw-calc__input {
+  padding-left: 24px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* El tacho no compite con los datos: aparece con la fila bajo el mouse o con
+   el foco adentro, y siempre ocupa su lugar para que nada salte de ancho. */
+.fw-calc__del { opacity: 0; transition: opacity var(--ox-t-1) var(--ox-ease-soft), background-color var(--ox-t-1) var(--ox-ease-soft), color var(--ox-t-1) var(--ox-ease-soft); }
+.fw-calc__row:hover .fw-calc__del,
+.fw-calc__row:focus-within .fw-calc__del,
+.fw-calc__del:focus-visible { opacity: 1; }
+.fw-calc__add {
+  display: flex;
+  align-items: center;
+  gap: var(--ox-3);
+  padding: var(--ox-3) var(--ox-4) var(--ox-4);
+}
+.fw-calc__foot { justify-content: space-between; padding: var(--ox-4); }
+.fw-calc__foot-text { display: flex; flex-direction: column; gap: 2px; }
+.fw-calc__label { font-size: var(--ox-fs-13); font-weight: var(--ox-w-medium); color: var(--ox-text-2); }
+.fw-calc__detalle--error { color: var(--ox-danger); }
+.fw-calc__total {
+  font-family: var(--ox-mono);
+  font-size: var(--ox-fs-26);
+  font-weight: var(--ox-w-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--ox-text);
+  user-select: text;
+}

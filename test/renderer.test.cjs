@@ -549,6 +549,76 @@ app.whenReady().then(async () => {
     ok('y el total no se movió',
       (await js(`window.fw.load().then((l) => l.length)`)) === totalDespues, String(totalDespues));
   }
+  console.log('\n9-ter. Calculadora: filas a mano y su suma');
+  await click('[data-view="calculadora"]');
+  await sleep(800);
+  ok('la calculadora monta con tres filas vacías', (await js(`document.querySelectorAll('.fw-calc__row').length`)) === 3);
+  const escribir = (i, campo, valor) => js(`(() => {
+    const el = document.querySelectorAll('.fw-calc__row')[${i}].querySelector('[data-campo="${campo}"]');
+    el.focus(); el.value = ${JSON.stringify(valor)};
+    el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  // fmtARS separa el $ con un espacio fino (U+2009): se normaliza para comparar.
+  const totalCalc = () => js(`document.getElementById('calc-total').textContent.replace(/\\s/g, ' ')`);
+
+  await escribir(0, 'concepto', 'Alquiler');
+  await escribir(0, 'monto', '250.000');
+  await escribir(1, 'monto', '1.234,50');
+  await escribir(2, 'monto', '15500');
+  ok('suma los formatos que acepta la carga ($ 266.734,5)', (await totalCalc()) === '$ 266.734,5', await totalCalc());
+
+  await escribir(2, 'monto', 'quince mil');
+  ok('un monto que no se entiende no suma', (await totalCalc()) === '$ 251.234,5', await totalCalc());
+  ok('y queda marcado en la fila', await js(`document.querySelectorAll('.fw-calc__input.is-invalid').length === 1`));
+  ok('y el pie lo dice', /sin entender/.test(await js(`document.getElementById('calc-detalle').textContent`)));
+  await escribir(2, 'monto', '15500');
+
+  /* Enter en el último monto agrega una fila y deja el cursor ahí: es lo que
+     permite cargar una lista larga sin tocar el mouse. Tecla REAL, no un
+     evento sintético, para probar el camino que usa Fran. */
+  await js(`document.querySelectorAll('.fw-calc__row')[2].querySelector('[data-campo="monto"]').focus()`);
+  win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Enter' });
+  win.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' });
+  await sleep(500);
+  ok('Enter en el último monto agrega una fila', (await js(`document.querySelectorAll('.fw-calc__row').length`)) === 4);
+  ok('y el cursor queda en su concepto',
+    await js(`document.activeElement === document.querySelectorAll('.fw-calc__row')[3].querySelector('[data-campo="concepto"]')`));
+
+  const filasAntes = await js(`document.querySelectorAll('.fw-calc__row').length`);
+  await click('.fw-calc__row:nth-child(2) [data-borrar]');
+  await sleep(500);
+  ok('borrar una fila la saca (con su salida animada)',
+    (await js(`document.querySelectorAll('.fw-calc__row').length`)) === filasAntes - 1);
+  ok('y el total la descuenta', (await totalCalc()) === '$ 265.500', await totalCalc());
+
+  /* Irse de la vista guarda lo pendiente sin esperar la demora, y la vuelta
+     trae lo mismo. Volver es también lo que delata un listener duplicado: un
+     click en «Agregar fila» tiene que agregar UNA. */
+  await click('[data-view="resumen"]');
+  await sleep(600);
+  const calcEnDisco = JSON.parse(fs.readFileSync(path.join(tmp, 'calculadora.json'), 'utf8'));
+  ok('se guardó en calculadora.json al salir', calcEnDisco.filas?.length === 3, JSON.stringify(calcEnDisco).slice(0, 160));
+  ok('el monto se guarda como se escribió', calcEnDisco.filas?.[0]?.monto === '250.000', calcEnDisco.filas?.[0]?.monto);
+  ok('y no tocó los movimientos',
+    !(await js(`window.fw.load().then((l) => l.some((m) => /Alquiler/.test(m.note || '')))`)));
+  await click('[data-view="calculadora"]');
+  await sleep(700);
+  ok('al volver están las mismas filas', (await totalCalc()) === '$ 265.500', await totalCalc());
+  const n0 = await js(`document.querySelectorAll('.fw-calc__row').length`);
+  await click('#calc-agregar');
+  await sleep(300);
+  ok('«Agregar fila» agrega una sola tras volver a la vista',
+    (await js(`document.querySelectorAll('.fw-calc__row').length`)) === n0 + 1);
+  const filaR = await rect('.fw-calc__row:last-child');
+  ok('la fila nueva cae dentro de la ventana', dentro(filaR), JSON.stringify(filaR));
+
+  await click('#calc-vaciar');
+  await sleep(600);
+  ok('vaciar pide confirmación', dentro(await rect('.ox-modal')));
+  await click('.ox-modal .ox-btn--danger-solid');
+  await sleep(800);
+  ok('y deja tres filas vacías en $ 0', (await js(`document.querySelectorAll('.fw-calc__row').length`)) === 3
+    && (await totalCalc()) === '$ 0', await totalCalc());
+
   await click('[data-view="movimientos"]');
   await sleep(700);
 

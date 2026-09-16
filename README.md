@@ -8,7 +8,7 @@ Sucesora de **FinWatch** (`C:\tools\FinWatch`), reconstruida desde la plantilla
 npm start          # abre la app
 npm run dev        # con la consola del renderer en la terminal
 npm test           # 136 checks en node pelado
-npm run smoke      # 98 checks montando el renderer en Electron
+npm run smoke      # 115 checks montando el renderer en Electron
 npm run dist       # arma el instalador: dist/Finway Setup X.Y.Z.exe
 npm run check-dist # verifica que el paquete traiga todo lo que la app pide
 npm run icons      # regenera los PNG, el .ico y la hoja de control
@@ -39,7 +39,7 @@ src/ipc.cjs           los canales, incluidos los de mov:*                  ← O
 renderer/css/         tokens, base, shell, controles, superficies, overlays ← Onyx
 renderer/css/finway.css   el par verde/rojo y lo del dominio
 renderer/js/          icons, motion, overlays, router, ui, format          ← Onyx
-renderer/js/fin/      format, categories, stats, charts, quickadd, views, ajustes, state, mark
+renderer/js/fin/      format, categories, stats, charts, quickadd, views, ajustes, calculadora, state, mark
 renderer/js/app.js    lo que une las dos mitades
 ```
 
@@ -111,6 +111,10 @@ las mismas matrices que Chromium y falla si divergieron.
 - **Meses**: flechas del encabezado o click en una barra del gráfico de flujo.
 - **Exportar**: el botón de descarga en Movimientos ofrece el CSV del mes (para
   Excel) o el respaldo completo (para mudarse).
+- **Calculadora**: filas de concepto y monto que se suman al tipear, como un
+  `SUMA()` de planilla. Enter pasa al campo siguiente y, en el último monto, abre
+  una fila nueva. Un monto que no se entiende queda marcado y no suma. Se guarda
+  sola en `calculadora.json`, aparte: **no son movimientos** y no tocan el balance.
 
 ## El ícono
 
