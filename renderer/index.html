@@ -1,0 +1,138 @@
+<meta charset="utf-8">
+<!-- CSP estricta: sin conexiones externas, sin eval. Finway no habla con nadie
+     — los datos son un JSON local y no hay una sola llamada de red. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+<title>Finway</title>
+
+<link rel="stylesheet" href="./css/fonts.css">
+<link rel="stylesheet" href="./css/tokens.css">
+<link rel="stylesheet" href="./css/base.css">
+<link rel="stylesheet" href="./css/motion.css">
+<link rel="stylesheet" href="./css/shell.css">
+<link rel="stylesheet" href="./css/controls.css">
+<link rel="stylesheet" href="./css/surfaces.css">
+<link rel="stylesheet" href="./css/overlays.css">
+<link rel="stylesheet" href="./css/finway.css">
+
+<style>
+  /* Boot splash: réplica exacta del primer frame. Pinta ANTES de que cargue
+     ningún módulo, así no hay un solo instante sin identidad en pantalla.
+     El color tiene que ser el mismo backgroundColor de la BrowserWindow —
+     literal, no una variable: los tokens todavía podrían no haber cargado. */
+  #boot-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    background: #0a0b0d;
+    transition: opacity .34s cubic-bezier(.16, 1, .3, 1);
+  }
+  #boot-splash svg { width: 54px; height: 54px; }
+  /* La F se ARMA, no aparece: el stem primero y los brazos en cascada hacia
+     abajo — el caudal bajando, que es de lo que habla la app. */
+  #boot-splash .fm-stem,
+  #boot-splash .fm-arm { transform-origin: 9px 24px; animation: boot-grow .5s cubic-bezier(.16,1,.3,1) both; }
+  #boot-splash .fm-stem { transform-origin: 9px 9px; animation-name: boot-rise; }
+  #boot-splash .fm-a1 { animation-delay: .16s; }
+  #boot-splash .fm-a2 { animation-delay: .27s; }
+  #boot-splash .fm-a3 { animation-delay: .38s; }
+  @keyframes boot-grow { from { transform: scaleX(0); opacity: 0 } to { transform: scaleX(1); opacity: 1 } }
+  @keyframes boot-rise { from { transform: scaleY(0); opacity: 0 } to { transform: scaleY(1); opacity: 1 } }
+</style>
+
+<div id="boot-splash">
+  <svg viewBox="0 0 48 48" fill="none">
+    <!-- Los tonos van literales, no en var(): esto pinta ANTES de que cargue
+         tokens.css. Son la escalera de texto de Onyx resuelta a hex, y tienen
+         que seguir a fin/mark.js — si divergen, el arranque pega un salto
+         cuando el splash le pasa la posta a la titlebar. -->
+    <defs>
+      <linearGradient id="fw-boot-g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#e9ebee"/>
+        <stop offset="1" stop-color="#6e737b"/>
+      </linearGradient>
+    </defs>
+    <rect class="fm-stem" x="9" y="9" width="5.5" height="30.5" rx="2.75" fill="url(#fw-boot-g)"/>
+    <rect class="fm-arm fm-a1" x="17.3" y="9"    width="21.7" height="5.5" rx="2.75" fill="#e9ebee"/>
+    <rect class="fm-arm fm-a2" x="17.3" y="17.3" width="14"   height="5.5" rx="2.75" fill="#a4a9b0"/>
+    <rect class="fm-arm fm-a3" x="17.3" y="25.6" width="18"   height="5.5" rx="2.75" fill="#6e737b"/>
+  </svg>
+</div>
+
+<div class="ox-app">
+
+  <!-- ── Titlebar propia: acá no hay frame nativo ─────────────────────────── -->
+  <header class="ox-titlebar">
+    <div class="ox-brand ox-no-drag" data-tip="Finway" id="brand">
+      <span class="fw-brand__mark" id="brand-mark"></span>
+      <span class="ox-brand__name">Finway</span>
+      <span class="ox-meta fw-brand__version" id="brand-version"></span>
+    </div>
+
+    <!-- Contexto de la vista actual: el mes que se está mirando. -->
+    <div class="ox-titlebar__context" id="titlebar-context"></div>
+
+    <div class="ox-wincontrols">
+      <button class="ox-wincontrol" id="win-min"   aria-label="Minimizar"><i data-icon="winMin"></i></button>
+      <button class="ox-wincontrol" id="win-max"   aria-label="Maximizar"><i data-icon="winMax"></i></button>
+      <button class="ox-wincontrol ox-wincontrol--close" id="win-close" aria-label="Cerrar"><i data-icon="winClose"></i></button>
+    </div>
+  </header>
+
+  <div class="ox-body">
+
+    <!-- ── Rail ──────────────────────────────────────────────────────────── -->
+    <nav class="ox-rail">
+      <div class="ox-rail__top">
+        <button class="ox-btn ox-btn--secondary ox-flashable" id="btn-new" style="width:100%"
+                data-tip="Cargar un movimiento" data-tip-key="Ctrl N">
+          <i data-icon="plus"></i> Nuevo movimiento
+        </button>
+      </div>
+
+      <div class="ox-rail__nav ox-scroll">
+        <div class="ox-rail__group">
+          <button class="ox-navitem" data-view="resumen">
+            <i data-icon="chart"></i> Resumen
+          </button>
+          <button class="ox-navitem" data-view="movimientos">
+            <i data-icon="list"></i> Movimientos <span class="ox-navitem__count">0</span>
+          </button>
+        </div>
+
+        <div class="ox-rail__group">
+          <div class="ox-rail__group-label">Sistema</div>
+          <button class="ox-navitem" data-view="ajustes">
+            <i data-icon="settings"></i> Ajustes
+          </button>
+        </div>
+      </div>
+
+      <div class="ox-rail__foot" id="rail-foot"></div>
+    </nav>
+
+    <!-- ── Vista ─────────────────────────────────────────────────────────── -->
+    <main class="ox-main" id="view"></main>
+  </div>
+
+  <!-- ── Statusbar ───────────────────────────────────────────────────────── -->
+  <footer class="ox-statusbar">
+    <div class="ox-statusbar__item" data-tip="Movimientos del mes en pantalla" data-tip-side="top">
+      <i data-icon="list"></i> <span class="ox-statusbar__value ox-num" id="stat-count">0</span> mov.
+    </div>
+    <div class="ox-statusbar__item" data-tip="Balance del mes en pantalla" data-tip-side="top">
+      <i data-icon="scale"></i> <span class="ox-statusbar__value ox-num" id="stat-balance">—</span>
+    </div>
+    <div class="ox-spacer"></div>
+    <div class="ox-statusbar__item" id="stat-saved" data-tip="Último guardado" data-tip-side="top">
+      <i data-icon="save"></i> <span class="ox-statusbar__value">—</span>
+    </div>
+  </footer>
+</div>
+
+<!-- Todos los overlays se portalean acá: fuera del flujo, por encima de todo. -->
+<div id="ox-layer"></div>
+
+<script type="module" src="./js/app.js"></script>
