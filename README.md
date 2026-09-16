@@ -8,7 +8,7 @@ Sucesora de **FinWatch** (`C:\tools\FinWatch`), reconstruida desde la plantilla
 npm start        # abre la app
 npm run dev      # con la consola del renderer en la terminal
 npm test         # 136 checks en node pelado
-npm run smoke    # 92 checks montando el renderer en Electron
+npm run smoke    # 98 checks montando el renderer en Electron
 ```
 
 ## Traer los datos de FinWatch
@@ -62,8 +62,20 @@ se integra en vez de borrar.
 
 El shell es acromático (el acento de Onyx es luz) y el color aparece solo donde
 es un dato: **verde entra, rojo sale**, y el balance toma el color de su signo.
-El rojo del gasto está corrido hacia el ladrillo para que `--ox-danger` siga
-queriendo decir que algo se rompió.
+
+**El par es el protagonista de esta app.** Una primera versión lo tuvo bajo de
+croma y corrido hacia el ladrillo para no chocar con el rojo de error de Onyx; el
+resultado tiraba a naranja y no decía lo que tiene que decir. El criterio quedó
+invertido: la ganancia y la pérdida mandan, y lo del sistema —`--ox-danger`
+incluido— se queda como viene. El botón de borrar pasa a ser el rojo más pálido
+de la pantalla y está bien: el error es del sistema, la pérdida es de la app.
+
+Los dos están **emparejados**, y no por tener el mismo número de croma: en sRGB el
+verde no llega tan lejos como el rojo (a L=58% el rojo aguanta 0.235 y el verde
+0.150), así que igualar la cifra dejaría el verde apagado. Lo que se iguala es la
+luminancia y el **porcentaje del techo de cada matiz**. Hay variantes `-text` un
+escalón más claras para el texto de 11 px, donde el par pleno no llega a 4,5:1 —
+mismo color, la luminancia justa para leerse. El humo mide las dos cosas.
 
 La excepción son las **categorías**, que llevan un abanico: en un donut el color
 no decora, es lo único que ata cada gajo con su renglón de la leyenda. Los once
@@ -95,10 +107,31 @@ las mismas matrices que Chromium y falla si divergieron.
 - **Exportar**: el botón de descarga en Movimientos ofrece el CSV del mes (para
   Excel) o el respaldo completo (para mudarse).
 
+## El ícono
+
+Un **desvío**: entra un caudal y se parte, una rama sube en verde y la otra baja
+en rojo. No tiene nada que ver con la F de barras de FinWatch, a propósito.
+
+```
+npm run icons     # regenera los PNG, el .ico y la hoja de control
+```
+
+Hay **dos masters** y los dos se mantienen juntos:
+
+- [assets/icon.svg](assets/icon.svg) para 32 px y más arriba;
+- [assets/icon-small.svg](assets/icon-small.svg) para 16 y 24, con el mismo dibujo
+  agrandado un 30% dentro de la misma baldosa. La baldosa va al 100% del lienzo
+  —es lo que evita que el ícono se vea más chico que el de al lado en la barra de
+  tareas—, pero a 16 px eso dejaba el glifo en unos 10 píxeles y el tronco en poco
+  más de uno.
+
+`assets/contacto.png` es la hoja de control: cada tamaño chico ampliado por vecino
+más cercano. **Es la única forma de decidir un ícono** — rasterizado a su tamaño
+real el trazo se redondea a píxeles enteros, y ahí aparece la mancha que achicando
+el de 256 no se ve nunca.
+
 ## Lo que falta
 
-- **La marca del sistema**: la "F" está en la titlebar y en el splash, pero la
-  app todavía no tiene íconos propios (`assets/`) ni empaquetado NSIS. FinWatch
-  los tiene en `scripts/make-icons.cjs` y son portables.
+- **Empaquetado NSIS**: el `.ico` ya está listo para `build.win.icon`.
 - **El tray**: FinWatch se esconde al tray al cerrar. Onyx no trae eso y acá
   todavía no está.

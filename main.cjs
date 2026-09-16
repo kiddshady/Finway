@@ -108,6 +108,10 @@ function createWindow(state) {
     show: false,
     paintWhenInitiallyHidden: true,
     backgroundColor: BG,
+    /* El .ico y no el PNG: trae todos los tamaños adentro, así Windows elige el
+       que corresponde en vez de achicar el grande. En Electron 40,
+       nativeImage lo lee hasta 256, que es lo que mira Nexus. */
+    icon: path.join(__dirname, 'assets', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,

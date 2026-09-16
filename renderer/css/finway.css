@@ -16,29 +16,47 @@
      Verde entra, rojo sale: el par de toda la vida de un extracto bancario.
      Heredado de FinWatch, la app de la que salió esta.
 
-     Los dos están bajados de croma a propósito. Un verde y un rojo de saturación
-     plena sobre una base casi negra vibran, y esta app muestra decenas de
-     números por pantalla: lo que tiene que resaltar es la CIFRA, no su color.
-     Misma luminancia en los dos para que pesen igual lado a lado.
+     EL PAR ES EL PROTAGONISTA de esta app. Una primera versión lo tuvo bajo de
+     croma y corrido hacia el ladrillo (hue 34) para no chocar con el rojo de
+     error de Onyx; el resultado tiraba a naranja y no decía lo que tiene que
+     decir. Acá el criterio se invirtió: la ganancia y la pérdida mandan, y las
+     cuestiones del sistema —`--ox-danger` incluido— se quedan como vienen. El
+     botón de borrar pasa a ser el rojo más pálido de la pantalla y está bien:
+     el error es del sistema, la pérdida es de la app.
 
-     El rojo del gasto NO es el rojo del fallo. Onyx reserva --ox-danger para
-     que algo se rompió, y si el rojo decora deja de significar: por eso el de
-     acá es más apagado y más terroso, y por eso los gastos de la lista van en
-     texto neutro con su signo −. El rojo aparece en los agregados (el total,
-     el donut, las barras) y en los negativos, no en cada fila. */
-  --fw-in:   oklch(72% .115 152);   /* ingreso — lo que entra */
-  --fw-out:  oklch(67% .128 34);    /* gasto   — lo que sale */
+     LOS DOS ESTÁN EMPAREJADOS, y no por tener el mismo número de croma. En sRGB
+     el verde no llega tan lejos que el rojo: a L=58% el rojo aguanta hasta
+     0.235 y el verde apenas 0.150, así que igualar la cifra dejaría el verde
+     apagado al lado del rojo. Lo que se iguala es la LUMINANCIA y el PORCENTAJE
+     del techo de cada matiz (~92%): los dos igual de cerca de su borde, los dos
+     igual de plenos.
+
+     Y los gastos de la LISTA siguen en texto neutro con su signo −: el rojo
+     aparece en los agregados (el balance, el donut, las barras) y en los
+     negativos. Teñir cada fila de una lista que es casi toda gastos convierte
+     al rojo en el color del fondo. */
+  --fw-in:   oklch(58% .142 152);   /* ingreso — lo que entra  · #1e914e */
+  --fw-out:  oklch(58% .219 27);    /* gasto   — lo que sale   · #df2326 */
 
   /* El balance no tiene color propio: ES verde o rojo según su signo, que es
      la única pregunta que se le hace. Antes era el amarillo de la terna, un
      tercer color que había que aprender. */
   --fw-bal:  var(--fw-in);
 
-  --fw-in-dim:   oklch(72% .115 152 / .55);
-  --fw-out-dim:  oklch(67% .128 34 / .55);
+  /* La misma tinta, un escalón más clara, SOLO para texto chico. El par de
+     arriba está calibrado para que la pérdida pegue, y a 26px del balance pega;
+     pero el readout de los gráficos es de 11px y ahí 3,77:1 contra la card no
+     alcanza para leer cómodo. No es otro color: es el mismo con la luminancia
+     justa para pasar 4,5:1. Las masas —donut, barras, área— siguen con el par
+     pleno, que es donde el color grita. */
+  --fw-in-text:  oklch(59% .142 152);
+  --fw-out-text: oklch(63% .219 27);
 
-  --fw-in-wash:  oklch(72% .115 152 / .12);
-  --fw-out-wash: oklch(67% .128 34 / .12);
+  --fw-in-dim:   oklch(58% .142 152 / .55);
+  --fw-out-dim:  oklch(58% .219 27 / .55);
+
+  --fw-in-wash:  oklch(58% .142 152 / .12);
+  --fw-out-wash: oklch(58% .219 27 / .12);
 
   /* La marca. Acromática como el resto del shell: la "F" se dibuja con la
      escalera de texto de Onyx y no con los colores del dominio. Para volver a
@@ -175,11 +193,11 @@
   letter-spacing: var(--ox-track-caps);
   color: var(--ox-text-4);
 }
-.fw-readout__in  { color: var(--fw-in);  font-variant-numeric: tabular-nums }
-.fw-readout__out { color: var(--fw-out); font-variant-numeric: tabular-nums }
+.fw-readout__in  { color: var(--fw-in-text);  font-variant-numeric: tabular-nums }
+.fw-readout__out { color: var(--fw-out-text); font-variant-numeric: tabular-nums }
 .fw-readout__net { margin-left: auto; font-variant-numeric: tabular-nums }
-.fw-readout__net--pos { color: var(--fw-in) }
-.fw-readout__net--neg { color: var(--fw-out) }
+.fw-readout__net--pos { color: var(--fw-in-text) }
+.fw-readout__net--neg { color: var(--fw-out-text) }
 .fw-readout__hint { margin-left: auto; color: var(--ox-text-4) }
 .fw-key { display: inline-flex; align-items: center; gap: 6px; color: var(--ox-text-4) }
 .fw-key__line { width: 14px; height: 2px; border-radius: 1px; background: currentColor }
@@ -294,7 +312,7 @@
 
 /* ── Lista de movimientos ───────────────────────────────────────────────── */
 .fw-amount { font-variant-numeric: tabular-nums; white-space: nowrap }
-.fw-amount--in  { color: var(--fw-in) }
+.fw-amount--in  { color: var(--fw-in-text) }
 .fw-amount--out { color: var(--ox-text-2) }
 .fw-cat { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap }
 .fw-note { color: var(--ox-text-3) }

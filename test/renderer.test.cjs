@@ -232,6 +232,56 @@ app.whenReady().then(async () => {
   await click('[data-month="hoy"]');
   await sleep(800);
 
+  console.log('\n3-bis. El par verde/rojo: parejo entre sí y legible');
+  /* El par es el protagonista de la app, así que tiene dos obligaciones que un
+     color decorativo no tiene: pesar IGUAL entre sí —si no, la pantalla se
+     inclina para un lado— y leerse al tamaño en que se lo usa. */
+  const par = await js(`(() => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 1;
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    const leer = (c) => { cx.clearRect(0,0,1,1); cx.fillStyle = c; cx.fillRect(0,0,1,1);
+      const d = cx.getImageData(0,0,1,1).data; return [d[0], d[1], d[2]]; };
+    const cs = getComputedStyle(document.documentElement);
+    const t = (n) => leer(cs.getPropertyValue(n));
+    return { in: t('--fw-in'), out: t('--fw-out'),
+             inText: t('--fw-in-text'), outText: t('--fw-out-text'),
+             bg: t('--ox-bg'), s2: t('--ox-s2') };
+  })()`);
+
+  const relL = ([r, g, b]) => {
+    const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const contraste = (a, b) => {
+    const [x, y] = [relL(a), relL(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+
+  /* Pesar igual = misma luminancia. No se comparan las cromas: en sRGB el verde
+     no llega tan lejos como el rojo, y exigir el mismo número dejaría el verde
+     apagado — el emparejado es por porcentaje del techo de cada matiz. */
+  const dif = Math.abs(relL(par.in) - relL(par.out));
+  ok(`el verde y el rojo pesan lo mismo (luminancias a ${dif.toFixed(3)})`, dif < 0.06,
+    `verde ${relL(par.in).toFixed(3)} · rojo ${relL(par.out).toFixed(3)}`);
+
+  /* El par pleno se usa en cifras grandes y en masas: le alcanza con 3:1.
+     Las variantes de texto van en el readout de 11px y necesitan 4.5:1. */
+  const cBalance = contraste(par.out, par.s2);
+  ok(`el rojo se lee en el balance de 26px (${cBalance.toFixed(2)}:1 sobre la card)`, cBalance >= 3);
+  for (const [nombre, color] of [['rojo', par.outText], ['verde', par.inText]]) {
+    const c = contraste(color, par.s2);
+    ok(`la variante de texto del ${nombre} se lee a 11px (${c.toFixed(2)}:1)`, c >= 4.5);
+  }
+  /* Y tienen que ser el MISMO color, no otro: si alguien "arregla" el contraste
+     cambiando el matiz, el verde de un readout dejaría de ser el verde de la app. */
+  const mismoTono = (a, b) => {
+    const h = ([r, g, bl]) => Math.atan2(g - bl, r - g);
+    return Math.abs(h(a) - h(b)) < 0.25;
+  };
+  ok('la variante clara del rojo sigue siendo el mismo rojo', mismoTono(par.out, par.outText),
+    `${par.out} vs ${par.outText}`);
+  ok('y la del verde, el mismo verde', mismoTono(par.in, par.inText), `${par.in} vs ${par.inText}`);
+
   console.log('\n4. Las dos vistas montan y quedan activas en el rail');
   for (const v of ['movimientos', 'resumen', 'movimientos']) {
     await click(`[data-view="${v}"]`);

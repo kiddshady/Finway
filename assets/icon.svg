@@ -1,0 +1,25 @@
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     FINWAY — el ícono, master
+     Un desvío: entra un caudal y se parte. Una rama sube en verde, la otra baja
+     en rojo — el mismo par semántico de la app, que es lo único que sigue
+     leyéndose a 16 px cuando la forma ya se está empastando.
+
+     Las tres reglas de los íconos de Fran, y las tres van juntas:
+       · con baldosa — el glifo adentro de un cuadrado de esquinas redondeadas;
+       · sin bordes — la baldosa no lleva contorno;
+       · a sangre — la baldosa llega al borde del lienzo, sin margen transparente.
+         Windows dibuja el lienzo completo, así que un margen del 6% se ve un 6%
+         más chico que el ícono de al lado en la barra de tareas.
+
+     Medidas: baldosa al 100% del lienzo, radio 48/256 (18,75%), trazo 19, glifo
+     dentro del ~58% central. Los colores están literales y no en var(): esto se
+     rasteriza fuera de la app, donde no hay tokens.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect width="256" height="256" rx="48" fill="#101216"/>
+  <g fill="none" stroke-width="19" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M54 128h48" stroke="#e9ebee"/>
+    <path d="M102 128 158 72h44" stroke="#1e914e"/>
+    <path d="M102 128 158 184h44" stroke="#df2326"/>
+  </g>
+</svg>
