@@ -5,11 +5,16 @@ Sucesora de **FinWatch** (`C:\tools\FinWatch`), reconstruida desde la plantilla
 [Onyx](C:\tools\Onyx) en septiembre de 2026.
 
 ```
-npm start        # abre la app
-npm run dev      # con la consola del renderer en la terminal
-npm test         # 136 checks en node pelado
-npm run smoke    # 98 checks montando el renderer en Electron
+npm start          # abre la app
+npm run dev        # con la consola del renderer en la terminal
+npm test           # 136 checks en node pelado
+npm run smoke      # 98 checks montando el renderer en Electron
+npm run dist       # arma el instalador: dist/Finway Setup X.Y.Z.exe
+npm run check-dist # verifica que el paquete traiga todo lo que la app pide
+npm run icons      # regenera los PNG, el .ico y la hoja de control
 ```
+
+Tras cambios de código, `npm run dist` y reinstalar: la app instalada no ve el repo.
 
 ## Traer los datos de FinWatch
 
@@ -130,8 +135,33 @@ más cercano. **Es la única forma de decidir un ícono** — rasterizado a su t
 real el trazo se redondea a píxeles enteros, y ahí aparece la mancha que achicando
 el de 256 no se ve nunca.
 
-## Lo que falta
+## El tray y la instancia única
 
-- **Empaquetado NSIS**: el `.ico` ya está listo para `build.win.icon`.
-- **El tray**: FinWatch se esconde al tray al cerrar. Onyx no trae eso y acá
-  todavía no está.
+**Cerrar la ventana la esconde al tray**, no mata la app. Se sale de verdad desde el
+menú del tray (click derecho → *Salir*); un click simple sobre el ícono la vuelve a
+mostrar. Al volver, el renderer relee el disco, así que lo que se haya escrito mientras
+dormía aparece solo.
+
+Por eso hay **una sola instancia**: con la app viva y escondida, un doble click en el
+acceso directo levantaría una segunda, y serían dos procesos escribiendo el mismo
+archivo. La segunda se va enseguida y la primera se muestra.
+
+El ícono del tray se arma con las tres resoluciones (16, 24 y 32) y no con el `.ico`:
+en Electron 40 `nativeImage` lee el `.ico` a 256 y Windows lo achicaría al tamaño del
+tray — justo el escalado que el master chico existe para evitar.
+
+## Empaquetado
+
+**Instalada, los datos van a `%APPDATA%Finwaydata`.** No es un detalle: la raíz de
+desarrollo (`data/` al lado del código) cae adentro de `app.asar`, que es de solo
+lectura, y como el store atrapa sus errores de escritura, cada guardado fallaría **en
+silencio** — la app abre, se carga un movimiento, se ve en pantalla, y al reiniciar no
+está. `src/store.cjs` detecta `app.isPackaged` y cambia de raíz.
+
+**`build.files` es una lista blanca**: lo que no está nombrado no entra al paquete, y
+eso no se nota nunca corriendo desde el repo. `npm run check-dist` no confía en una lista
+escrita a mano: **descubre** lo necesario leyendo el código (los `<link>` y `<script>`
+del index, los `import` en árbol, las fuentes de los CSS, los `require` del main y los
+assets que lee en runtime) y lo compara contra el índice del `.asar`. Distingue dos
+errores con arreglos distintos: un archivo que existe en el repo y no entró al paquete
+(revisar `build.files`) y uno que el código pide y no existe en ningún lado (un typo).

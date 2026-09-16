@@ -31,7 +31,25 @@
 const fsp = require('fs/promises');
 const path = require('path');
 
-const ROOT = process.env.FINWAY_DATA || path.join(__dirname, '..', 'data');
+/* ── Dónde viven los datos ────────────────────────────────────────────────────
+   En dev, `data/` al lado del código. EMPAQUETADA, eso sería un error silencioso:
+   `__dirname` cae dentro de `app.asar`, que es de solo lectura, y como el store
+   atrapa sus errores de escritura, cada guardado fallaría sin que salte nada —
+   la app abre, cargás movimientos, se ven en pantalla, y al reiniciar no están.
+   Instalada, va a `%APPDATA%\Finway\data`.
+
+   El `require('electron')` va adentro de un try porque los tests cargan este
+   módulo con node pelado, y ahí `require('electron')` no devuelve la API sino
+   la ruta al ejecutable: `app` queda undefined y se sigue con la raíz de dev. */
+function raizPorDefecto() {
+  try {
+    const { app } = require('electron');
+    if (app && app.isPackaged) return path.join(app.getPath('userData'), 'data');
+  } catch { /* node pelado: no hay app */ }
+  return path.join(__dirname, '..', 'data');
+}
+
+const ROOT = process.env.FINWAY_DATA || raizPorDefecto();
 const SETTINGS_FILE = path.join(ROOT, 'settings.json');
 
 /* ── Ajustes de tu app ───────────────────────────────────────────────────────

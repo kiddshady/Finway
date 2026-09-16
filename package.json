@@ -2,18 +2,57 @@
   "name": "finway",
   "productName": "Finway",
   "version": "0.1.0",
-  "description": "Finway — app de escritorio construida sobre Onyx.",
+  "description": "Finway — registro de gastos e ingresos con análisis de balances.",
   "main": "main.cjs",
-  "author": "Fran",
+  "author": "Kidd Shady · Umbrovex Systems",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "test": "node test/tokens.test.mjs && node test/store.test.mjs && node test/format.test.mjs && node test/dominio-format.test.mjs && node test/movimientos.test.mjs",
     "smoke": "electron test/renderer.test.cjs",
-    "icons": "electron tools/iconos.mjs"
+    "icons": "electron tools/iconos.mjs",
+    "dist": "electron-builder --win",
+    "check-dist": "node tools/verificar-paquete.mjs"
   },
   "devDependencies": {
-    "electron": "40.10.2"
+    "electron": "40.10.2",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.kiddshady.finway",
+    "productName": "Finway",
+    "copyright": "© 2026 Kidd Shady · Umbrovex Systems",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "src/**/*",
+      "renderer/**/*",
+      "assets/icon.ico",
+      "assets/icon_16.png",
+      "assets/icon_24.png",
+      "assets/icon_32.png",
+      "!data/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Finway"
+    }
   }
 }

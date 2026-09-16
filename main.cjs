@@ -31,10 +31,31 @@
                anteriores es blanco hardcodeado y no hay forma de taparlo.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const { app, BrowserWindow, ipcMain, screen, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, nativeImage, screen, shell, Tray } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const ipc = require('./src/ipc.cjs');
 const store = require('./src/store.cjs');
+
+/* ── Una sola instancia ──────────────────────────────────────────────────────
+   Con el tray, cerrar la ventana no mata la app: queda viva, escondida. Sin
+   este candado, un doble click en el acceso directo levantaría una SEGUNDA
+   instancia — dos procesos escribiendo el mismo archivo de movimientos, cada
+   uno con su propia ventana. La segunda se va enseguida y le avisa a la
+   primera, que se muestra. */
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
+
+/* Sin esto, Windows agrupa la ventana en la barra de tareas bajo el ejecutable
+   de Electron y no bajo Finway: otro ícono, y las notificaciones sin nombre. */
+app.setAppUserModelId('com.kiddshady.finway');
+
+/** true solo cuando la salida es intencional (el "Salir" del tray). */
+let saliendo = false;
+/** @type {Tray | null} */
+let tray = null;
 
 /* Color base de arranque. Tiene que coincidir con --ox-bg de tokens.css.
    Como --ox-bg es oklch y Electron solo entiende hex, el renderer se lo vuelve
@@ -158,8 +179,58 @@ function createWindow(state) {
   });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
 
+  /* Cerrar = esconder al tray. La app se va de verdad solo desde "Salir" del
+     menú del tray, que prende `saliendo` antes de pedir el quit. */
+  win.on('close', (e) => {
+    if (saliendo) return;
+    e.preventDefault();
+    win.hide();
+  });
+
   win.on('closed', () => { win = null; });
 }
+
+/* Traer la ventana desde donde esté: escondida en el tray, minimizada, o
+   detrás de otra. Al recuperar el foco el renderer relee el disco (app.js),
+   así que lo que se cargó mientras dormía aparece solo. */
+function mostrarVentana() {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  if (!win.isVisible()) win.show();
+  win.focus();
+}
+
+/* ── El tray ─────────────────────────────────────────────────────────────────
+   El ícono se arma con las tres resoluciones y no con el .ico: en Electron 40
+   `nativeImage.createFromPath` lee el .ico a 256×256, y Windows lo achica al
+   tamaño del tray — justo el escalado que el master chico existe para evitar.
+   Con las representaciones por escala, Windows toma la que corresponde a los
+   DPI de la pantalla: 16 px al 100%, 24 al 150%, 32 al 200%. */
+function crearTray() {
+  const icono = nativeImage.createEmpty();
+  for (const [lado, escala] of [[16, 1], [24, 1.5], [32, 2]]) {
+    icono.addRepresentation({
+      scaleFactor: escala,
+      buffer: fs.readFileSync(path.join(__dirname, 'assets', `icon_${lado}.png`)),
+    });
+  }
+
+  tray = new Tray(icono);
+  tray.setToolTip('Finway');
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Mostrar Finway', click: mostrarVentana },
+    { type: 'separator' },
+    { label: 'Salir', click: () => { saliendo = true; app.quit(); } },
+  ]));
+  // Un click simple muestra: el menú queda para el click derecho.
+  tray.on('click', mostrarVentana);
+}
+
+app.on('second-instance', mostrarVentana);
+
+/* Cualquier salida que no pase por el tray —apagar Windows, cerrar sesión, un
+   `app.quit()` desde otro lado— también tiene que poder cerrar la ventana. */
+app.on('before-quit', () => { saliendo = true; });
 
 /* ── Controles de ventana ────────────────────────────────────────────────────
    La titlebar es nuestra (frame:false), así que minimizar/maximizar/cerrar
@@ -183,6 +254,7 @@ ipcMain.on('win:set-bg', (_e, hex) => {
 app.whenReady().then(async () => {
   ipc.register();
   createWindow(await loadWindowState());
+  crearTray();
 });
 
 app.on('window-all-closed', () => {
