@@ -54,9 +54,10 @@ function updateChrome() {
   document.querySelector('[data-view="movimientos"] .ox-navitem__count').textContent = t.count;
   document.getElementById('stat-count').textContent = t.count;
 
+  /* El balance de la statusbar no se tiñe: como toda cifra de la app, el signo
+     alcanza. (Hasta el 17 sep 2026 tomaba el verde o el rojo del par.) */
   const balance = document.getElementById('stat-balance');
   balance.textContent = fmtARS(t.balance);
-  balance.style.color = t.count === 0 ? '' : `var(--fw-${t.balance < 0 ? 'out' : 'bal'})`;
 
   const saved = document.querySelector('#stat-saved .ox-statusbar__value');
   if (saved) saved.textContent = S.lastSaved ? relTime(S.lastSaved) : '—';

@@ -187,8 +187,9 @@ app.whenReady().then(async () => {
   ok('y ninguno lleva color', chips.every((c) => croma(c) < 0.03));
   ok('la tabla no pinta puntitos de categoría', !(await js(`!!document.querySelector('#mv-rows .fw-dot')`)));
 
-  /* El balance toma el color de su signo. Con datos sembrados el mes actual da
-     positivo; el anterior tiene un gasto y ningún ingreso, así que da negativo. */
+  /* Las cifras NO cambian de color con el signo (17 sep 2026): el balance da
+     positivo este mes y negativo el anterior —el anterior tiene un gasto y
+     ningún ingreso— y tiene que verse con la misma tinta en los dos. */
   await click('[data-view="resumen"]');
   await sleep(800);
   ok('los KPIs son cifras sueltas de Onyx, sin tarjeta',
@@ -198,10 +199,23 @@ app.whenReady().then(async () => {
   await click('[data-month="-1"]');
   await sleep(800);
   const balNeg = await valorBal();
-  ok('con balance negativo la cifra cambia de color', balNeg !== balPos, `${balPos} -> ${balNeg}`);
-  const danger = await js(`(() => { const p = document.createElement('span'); p.style.color = 'var(--ox-danger)';
+  ok('con balance negativo la cifra NO cambia de color', balNeg === balPos, `${balPos} -> ${balNeg}`);
+  const textoPrim = await js(`(() => { const p = document.createElement('span'); p.style.color = 'var(--ox-text)';
     document.body.appendChild(p); const c = getComputedStyle(p).color; p.remove(); return c; })()`);
-  ok('y el rojo es el danger de Onyx', balNeg === danger, `${balNeg} vs ${danger}`);
+  ok('y es el texto primario de Onyx, no el par verde/rojo', balNeg === textoPrim, `${balNeg} vs ${textoPrim}`);
+  /* Ninguna cifra de la app se tiñe: ni los otros KPIs, ni los montos de la
+     lista, ni el campo de carga. El croma lo mide el mismo lector de siempre. */
+  const cifras = await js(`(() => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 1;
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    const leer = (c) => { cx.clearRect(0,0,1,1); cx.fillStyle = c; cx.fillRect(0,0,1,1);
+      const d = cx.getImageData(0,0,1,1).data; return [d[0], d[1], d[2]]; };
+    return [...document.querySelectorAll('.fw-kpi .ox-stat__value, .fw-amount, .fw-readout__in, .fw-readout__out, .fw-readout__net, .fw-amountfield__input')]
+      .map((e) => leer(getComputedStyle(e).color));
+  })()`);
+  const gris = ([r, g, b]) => Math.max(r, g, b) - Math.min(r, g, b) < 12;
+  ok(`las ${cifras.length} cifras a la vista son neutras`, cifras.length > 0 && cifras.every(gris),
+    JSON.stringify(cifras.filter((c) => !gris(c))));
   await click('[data-month="hoy"]');
   await sleep(800);
 
@@ -216,9 +230,7 @@ app.whenReady().then(async () => {
       const d = cx.getImageData(0,0,1,1).data; return [d[0], d[1], d[2]]; };
     const cs = getComputedStyle(document.documentElement);
     const t = (n) => leer(cs.getPropertyValue(n));
-    return { in: t('--fw-in'), out: t('--fw-out'),
-             inText: t('--fw-in-text'), outText: t('--fw-out-text'),
-             bg: t('--ox-bg'), s2: t('--ox-s2') };
+    return { in: t('--fw-in'), out: t('--fw-out'), bg: t('--ox-bg'), s2: t('--ox-s2') };
   })()`);
 
   const relL = ([r, g, b]) => {
@@ -237,23 +249,12 @@ app.whenReady().then(async () => {
   ok(`el verde y el rojo pesan lo mismo (luminancias a ${dif.toFixed(3)})`, dif < 0.06,
     `verde ${relL(par.in).toFixed(3)} · rojo ${relL(par.out).toFixed(3)}`);
 
-  /* El par pleno se usa en cifras grandes y en masas: le alcanza con 3:1.
-     Las variantes de texto van en el readout de 11px y necesitan 4.5:1. */
-  const cBalance = contraste(par.out, par.s2);
-  ok(`el rojo se lee en el balance de 26px (${cBalance.toFixed(2)}:1 sobre la card)`, cBalance >= 3);
-  for (const [nombre, color] of [['rojo', par.outText], ['verde', par.inText]]) {
+  /* El par vive solo en masas y trazos del gráfico —barras, línea, leyendas—,
+     nunca en texto chico: le alcanza con 3:1 contra la card. */
+  for (const [nombre, color] of [['rojo', par.out], ['verde', par.in]]) {
     const c = contraste(color, par.s2);
-    ok(`la variante de texto del ${nombre} se lee a 11px (${c.toFixed(2)}:1)`, c >= 4.5);
+    ok(`el ${nombre} se lee sobre la card (${c.toFixed(2)}:1)`, c >= 3);
   }
-  /* Y tienen que ser el MISMO color, no otro: si alguien "arregla" el contraste
-     cambiando el matiz, el verde de un readout dejaría de ser el verde de la app. */
-  const mismoTono = (a, b) => {
-    const h = ([r, g, bl]) => Math.atan2(g - bl, r - g);
-    return Math.abs(h(a) - h(b)) < 0.25;
-  };
-  ok('la variante clara del rojo sigue siendo el mismo rojo', mismoTono(par.out, par.outText),
-    `${par.out} vs ${par.outText}`);
-  ok('y la del verde, el mismo verde', mismoTono(par.in, par.inText), `${par.in} vs ${par.inText}`);
 
   console.log('\n4. Las dos vistas montan y quedan activas en el rail');
   for (const v of ['movimientos', 'resumen', 'movimientos']) {
@@ -300,8 +301,10 @@ app.whenReady().then(async () => {
   const foco = await js(`(() => { const i = document.getElementById('qa-amount');
     if (document.activeElement !== i) return { llego: false };
     const s = getComputedStyle(i);
+    const p = document.createElement('span'); p.style.color = 'var(--ox-text)';
+    document.body.appendChild(p); const primario = getComputedStyle(p).color; p.remove();
     return { llego: true, focusVisible: i.matches(':focus-visible'),
-             sombra: s.boxShadow, caret: s.caretColor, texto: s.color }; })()`);
+             sombra: s.boxShadow, caret: s.caretColor, texto: s.color, primario }; })()`);
   ok('el Tab llega al campo de monto', foco.llego, JSON.stringify(foco));
   ok('el input NO dibuja su propio anillo adentro de la caja',
     foco.sombra === 'none', String(foco.sombra));
@@ -328,8 +331,13 @@ app.whenReady().then(async () => {
   const caja = await js(`(() => { const s = getComputedStyle(document.getElementById('qa-amountfield'));
     return { sombra: s.boxShadow, fondo: s.backgroundColor }; })()`);
   ok('con el foco, la caja lleva el anillo de Onyx', /0px 0px 0px 3px/.test(caja.sombra), String(caja.sombra));
-  ok('el cursor es blanco, no del color del tipo',
-    foco.caret !== foco.texto, `caret=${foco.caret} texto=${foco.texto}`);
+  /* Antes esto medía caret ≠ texto, porque la cifra se teñía según el tipo.
+     Desde que las cifras son neutras los dos son el texto primario de Onyx, y
+     lo que hay que custodiar es justamente eso: que ninguno de los dos vuelva
+     a tomar el verde o el rojo. */
+  ok('el cursor y la cifra son el texto primario, sin tinte del tipo',
+    foco.caret === foco.primario && foco.texto === foco.primario,
+    `caret=${foco.caret} texto=${foco.texto} primario=${foco.primario}`);
   await js(`document.getElementById('qa-amount').blur()`);
   await sleep(400);
   const sinFoco = await js(`getComputedStyle(document.getElementById('qa-amountfield')).boxShadow`);

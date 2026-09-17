@@ -4,11 +4,12 @@
    qué significan los colores de esta app y cómo se dibujan sus gráficos.
 
    La regla de color de Finway, en una línea: el SHELL es acromático (el
-   acento de Onyx sigue siendo luz) y el par verde/rojo aparece SOLO donde es
-   un dato — verde entra, rojo sale, y el balance toma el color de su signo.
+   acento de Onyx sigue siendo luz), LAS CIFRAS SON NEUTRAS —el signo ya dice
+   si entra o sale— y el par verde/rojo queda únicamente en los GRÁFICOS, donde
+   el color es lo único que separa una serie de la otra.
    Todo lo demás —editar, hoy, el día elegido, el foco— va con el acento o con
-   la escalera de grises, porque no son plata. Así el color nunca decora: si
-   algo está teñido, es porque significa.
+   la escalera de grises. Así el color nunca decora: si algo está teñido, es
+   porque sin tinta no se distinguiría.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -28,21 +29,14 @@
      del suyo a L=62% (misma luminancia relativa). Si cambia el danger, esta
      cuenta hay que rehacerla: el de humo mide que sigan pesando igual.
 
-     Y los gastos de la LISTA siguen en texto neutro con su signo −: el rojo
-     aparece en los agregados (el balance, la línea, las barras) y en los
-     negativos. Teñir cada fila de una lista que es casi toda gastos convierte
-     al rojo en el color del fondo. */
+     DESDE EL 17 SEP 2026 EL PAR NO TOCA NINGÚN NÚMERO (pedido de Fran): ni los
+     KPIs, ni el balance, ni los montos de la lista, ni la cifra del campo de
+     carga. Todos van con la escalera de texto de Onyx. El signo (+ / −) ya
+     distingue, y en una app que es casi toda gastos el rojo terminaba siendo
+     el color del fondo en vez de un dato. Lo que sí sigue teñido: las barras,
+     la línea y sus leyendas, porque ahí el color ES la etiqueta de la serie. */
   --fw-in:   oklch(62% .093 152);   /* ingreso — lo que entra  · #59966a */
   --fw-out:  var(--ox-danger);      /* gasto   — lo que sale   · #d4676b */
-
-  /* El balance no tiene color propio: ES verde o rojo según su signo. */
-  --fw-bal:  var(--fw-in);
-
-  /* Para texto chico (el readout de 11px). Con el par de Onyx el contraste ya
-     pasa 4,5:1 contra la card, así que son el mismo color; quedan como tokens
-     aparte para que endurecer el par no obligue a buscar cada texto. */
-  --fw-in-text:  var(--fw-in);
-  --fw-out-text: var(--fw-out);
 
   --fw-in-dim:   oklch(62% .093 152 / .55);
   --fw-out-dim:  rgb(var(--ox-danger-rgb) / .55);
@@ -91,8 +85,8 @@
 
 /* ── KPIs ───────────────────────────────────────────────────────────────────
    Las cifras sueltas de Onyx (.ox-stat), sin tarjeta ni canto de color: igual
-   que la fila de números del Inicio de la plantilla. El color vive en la cifra,
-   que es el dato; el balance es la única que crece. */
+   que la fila de números del Inicio de la plantilla. Las tres van en el texto
+   primario, den lo que den; el balance es la única que crece. */
 .fw-kpis {
   display: flex;
   flex-wrap: wrap;
@@ -101,10 +95,7 @@
   margin-bottom: 28px;
 }
 .fw-kpi .ox-stat__value { transition: var(--tr-color) }
-.fw-kpi--in   .ox-stat__value { color: var(--fw-in) }
-.fw-kpi--out  .ox-stat__value { color: var(--fw-out) }
-.fw-kpi--bal  .ox-stat__value { color: var(--fw-bal); font-size: var(--ox-fs-26) }
-.fw-kpi--bal.is-negative .ox-stat__value { color: var(--fw-out) }
+.fw-kpi--bal  .ox-stat__value { font-size: var(--ox-fs-26) }
 .fw-kpi__sub {
   font-size: var(--ox-fs-11);
   color: var(--ox-text-4);
@@ -151,11 +142,11 @@
   letter-spacing: var(--ox-track-caps);
   color: var(--ox-text-4);
 }
-.fw-readout__in  { color: var(--fw-in-text);  font-variant-numeric: tabular-nums }
-.fw-readout__out { color: var(--fw-out-text); font-variant-numeric: tabular-nums }
-.fw-readout__net { margin-left: auto; font-variant-numeric: tabular-nums }
-.fw-readout__net--pos { color: var(--fw-in-text) }
-.fw-readout__net--neg { color: var(--fw-out-text) }
+/* Las cifras del readout van neutras: quien dice de qué serie es cada una es
+   el signo, y la leyenda de al lado con su línea o su punto teñido. */
+.fw-readout__in  { color: var(--ox-text-2); font-variant-numeric: tabular-nums }
+.fw-readout__out { color: var(--ox-text-2); font-variant-numeric: tabular-nums }
+.fw-readout__net { margin-left: auto; color: var(--ox-text-2); font-variant-numeric: tabular-nums }
 .fw-readout__hint { margin-left: auto; color: var(--ox-text-4) }
 .fw-key { display: inline-flex; align-items: center; gap: 6px; color: var(--ox-text-4) }
 .fw-key__line { width: 14px; height: 2px; border-radius: 1px; background: currentColor }
@@ -269,9 +260,9 @@
 .fw-bar-month.is-selected { fill: var(--ox-text); font-weight: var(--ox-w-semi) }
 
 /* ── Lista de movimientos ───────────────────────────────────────────────── */
-.fw-amount { font-variant-numeric: tabular-nums; white-space: nowrap }
-.fw-amount--in  { color: var(--fw-in-text) }
-.fw-amount--out { color: var(--ox-text-2) }
+/* Ingreso y gasto comparten tinta: los separa el signo, no el color. Las
+   clases --in / --out se quedan porque son el gancho semántico de la fila. */
+.fw-amount { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ox-text-2) }
 .fw-cat { white-space: nowrap; color: var(--ox-text-2) }
 .fw-note { color: var(--ox-text-3) }
 /* La fila que se está editando se marca con el canto, no con un baño de color:
@@ -307,8 +298,9 @@
 }
 .fw-qa__banner-inner .ox-iconbtn { margin-left: auto; color: var(--ox-text-3) }
 
-/* El monto: el campo más grande de la app, en mono, con la cifra teñida por
-   el tipo. La CAJA es un .ox-input agrandado —hundido, con su hairline, y al
+/* El monto: el campo más grande de la app, en mono y en texto primario —lo que
+   dice si entra o sale es el segmentado de arriba, no la tinta de la cifra.
+   La CAJA es un .ox-input agrandado —hundido, con su hairline, y al
    enfocarse el mismo anillo que cualquier campo de Onyx—; el anillo lo pone la
    caja con :focus-within y no el <input> de adentro, que si no dibujaría el
    suyo y quedarían dos concéntricos. */
@@ -327,8 +319,6 @@
   background: var(--ox-bg);
   box-shadow: inset 0 0 0 1px var(--ox-line-3), 0 0 0 3px var(--ox-wash-1);
 }
-.fw-amountfield--expense { --fw-field-color: var(--fw-out) }
-.fw-amountfield--income  { --fw-field-color: var(--fw-in) }
 .fw-amountfield__currency { font-size: var(--ox-fs-19); color: var(--ox-text-4) }
 .fw-amountfield__input {
   flex: 1 1 auto;
@@ -336,8 +326,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--fw-field-color, var(--ox-text));
-  /* El caret no se tiñe con el tipo: el que escribe es uno solo. */
+  color: var(--ox-text);
   caret-color: var(--ox-text);
   font-family: var(--ox-mono);
   font-size: 23px;
