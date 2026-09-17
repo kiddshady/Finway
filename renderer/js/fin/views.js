@@ -12,7 +12,7 @@ import { Menu, Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
 import { bindSwitcher, stagger } from '../motion.js';
 import { esc, head, paint, viewEl } from '../ui.js';
-import { catColor, catLabel } from './categories.js';
+import { catLabel } from './categories.js';
 import { barsHTML, donutHTML, lineHTML, wireBars, wireDonut, wireLine } from './charts.js';
 import { currentMonth, dayLabel, fmtARS, monthTitle, shiftMonth, todayStr } from './format.js';
 import { markSVG } from './mark.js';
@@ -138,7 +138,7 @@ function rowsHTML(list) {
     <tr class="ox-tr ox-in-fade${QuickAdd.editing?.id === m.id ? ' is-editing' : ''}" data-id="${esc(m.id)}">
       <td class="ox-mono ox-dim" style="width:1%;white-space:nowrap">${dayLabel(m.date)}</td>
       <td style="width:1%">
-        <span class="fw-cat"><span class="fw-dot" style="background:${catColor(m.category)}"></span>${esc(catLabel(m.category))}</span>
+        <span class="fw-cat">${esc(catLabel(m.category))}</span>
       </td>
       <td><div class="fw-note ox-truncate ox-copyable">${esc(m.note)}</div></td>
       <td class="ox-td--num fw-amount fw-amount--${m.type === 'income' ? 'in' : 'out'} ox-copyable">

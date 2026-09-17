@@ -65,28 +65,25 @@ se integra en vez de borrar.
 
 ## Color
 
-El shell es acromático (el acento de Onyx es luz) y el color aparece solo donde
-es un dato: **verde entra, rojo sale**, y el balance toma el color de su signo.
+Finway es Onyx con un solo agregado de color: **verde entra, rojo sale**, y el
+balance toma el color de su signo. Todo lo demás —el shell, los chips, las
+categorías— es acromático, como la plantilla.
 
-**El par es el protagonista de esta app.** Una primera versión lo tuvo bajo de
-croma y corrido hacia el ladrillo para no chocar con el rojo de error de Onyx; el
-resultado tiraba a naranja y no decía lo que tiene que decir. El criterio quedó
-invertido: la ganancia y la pérdida mandan, y lo del sistema —`--ox-danger`
-incluido— se queda como viene. El botón de borrar pasa a ser el rojo más pálido
-de la pantalla y está bien: el error es del sistema, la pérdida es de la app.
+**El rojo es `--ox-danger`.** Hubo una etapa con un rojo propio más saturado, para
+que la pérdida "pegara"; desde el 17 sep 2026 la app se quiere más fiel a Onyx y
+perder plata usa la misma tinta que un fallo del sistema. Si Onyx cambia su
+danger, Finway lo sigue sola.
 
-Los dos están **emparejados**, y no por tener el mismo número de croma: en sRGB el
-verde no llega tan lejos como el rojo (a L=58% el rojo aguanta 0.235 y el verde
-0.150), así que igualar la cifra dejaría el verde apagado. Lo que se iguala es la
-luminancia y el **porcentaje del techo de cada matiz**. Hay variantes `-text` un
-escalón más claras para el texto de 11 px, donde el par pleno no llega a 4,5:1 —
-mismo color, la luminancia justa para leerse. El humo mide las dos cosas.
+El verde está **emparejado** con ese rojo, y no por el número de croma: en sRGB el
+verde no llega tan lejos como el rojo, así que se iguala la luminancia y el
+**porcentaje del techo de cada matiz** (~57%). Si el danger cambia, la cuenta se
+rehace; el humo mide que sigan pesando igual y que se lean a 11 px.
 
-La excepción son las **categorías**, que llevan un abanico: en un donut el color
-no decora, es lo único que ata cada gajo con su renglón de la leyenda. Los once
-salieron de maximizar la distancia perceptual mínima entre todos los pares, con
-croma ≤ .14 y esquivando el verde y el rojo semánticos. El humo mide esa
-distancia y falla si alguien aprieta el abanico.
+Las **categorías no tienen color.** En el donut cada gajo toma el gris de su
+**puesto** en el mes (el más grande, el más claro) y la leyenda va en ese mismo
+orden. Ojo: una rampa con un gris *fijo por categoría* ya se probó y dejó el donut
+ilegible; lo que funciona es que el gris lo decida el ranking. El humo mide que la
+escalera baje de a escalones visibles y que nada tenga croma.
 
 Toda la escalera sale de dos perillas en
 [renderer/css/tokens.css](renderer/css/tokens.css) (`--ox-hue` y `--ox-tint`),
@@ -118,8 +115,10 @@ las mismas matrices que Chromium y falla si divergieron.
 
 ## El ícono
 
-Un **desvío**: entra un caudal y se parte, una rama sube en verde y la otra baja
-en rojo. No tiene nada que ver con la F de barras de FinWatch, a propósito.
+La **F de barras** de la titlebar y el splash, en baldosa: la versión acromática
+de la marca de FinWatch, con la escalera de texto de Onyx resuelta a hex. Reemplazó
+al "desvío" verde/rojo el 17 sep 2026. Su geometría es la de `fin/mark.js`: si se
+toca una, se tocan los cuatro lugares (mark.js, el splash y los dos masters).
 
 ```
 npm run icons     # regenera los PNG, el .ico y la hoja de control

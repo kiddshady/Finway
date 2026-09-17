@@ -1,25 +1,29 @@
 <!-- ═══════════════════════════════════════════════════════════════════════════
      FINWAY — el ícono, master
-     Un desvío: entra un caudal y se parte. Una rama sube en verde, la otra baja
-     en rojo — el mismo par semántico de la app, que es lo único que sigue
-     leyéndose a 16 px cuando la forma ya se está empastando.
+     La misma "F" de barras de la titlebar y del splash, acromática: el stem en
+     degradé y tres brazos que se van apagando hacia abajo, con la escalera de
+     texto de Onyx resuelta a hex (acá no hay tokens). Es la versión sin color
+     de la marca de FinWatch. Desde el 17 sep 2026 reemplaza al "desvío"
+     verde/rojo: la app se quiso más fiel a Onyx, y el ícono pasó a ser la marca.
 
-     Las tres reglas de los íconos de Fran, y las tres van juntas:
-       · con baldosa — el glifo adentro de un cuadrado de esquinas redondeadas;
-       · sin bordes — la baldosa no lleva contorno;
-       · a sangre — la baldosa llega al borde del lienzo, sin margen transparente.
-         Windows dibuja el lienzo completo, así que un margen del 6% se ve un 6%
-         más chico que el ícono de al lado en la barra de tareas.
+     Las tres reglas de los íconos de Fran, juntas: con baldosa, sin bordes y a
+     sangre (la baldosa al 100% del lienzo, radio 48/256). Glifo al ~58%.
 
-     Medidas: baldosa al 100% del lienzo, radio 48/256 (18,75%), trazo 19, glifo
-     dentro del ~58% central. Los colores están literales y no en var(): esto se
-     rasteriza fuera de la app, donde no hay tokens.
+     Geometría = fin/mark.js y el splash de index.html, en su viewBox de 48,
+     escalada y centrada. Si se toca una, se tocan las cuatro.
      ═══════════════════════════════════════════════════════════════════════════ -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e9ebee"/>
+      <stop offset="1" stop-color="#6e737b"/>
+    </linearGradient>
+  </defs>
   <rect width="256" height="256" rx="48" fill="#101216"/>
-  <g fill="none" stroke-width="19" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M54 128h48" stroke="#e9ebee"/>
-    <path d="M102 128 158 72h44" stroke="#1e914e"/>
-    <path d="M102 128 158 184h44" stroke="#df2326"/>
+  <g transform="translate(11.12 9.90) scale(4.87)">
+    <rect x="9" y="9" width="5.5" height="30.5" rx="2.75" fill="url(#g)"/>
+    <rect x="17.3" y="9" width="21.7" height="5.5" rx="2.75" fill="#e9ebee"/>
+    <rect x="17.3" y="17.3" width="14" height="5.5" rx="2.75" fill="#a4a9b0"/>
+    <rect x="17.3" y="25.6" width="18" height="5.5" rx="2.75" fill="#6e737b"/>
   </g>
 </svg>

@@ -14,56 +14,44 @@
 :root {
   /* ── El par semántico ──────────────────────────────────────────────────────
      Verde entra, rojo sale: el par de toda la vida de un extracto bancario.
-     Heredado de FinWatch, la app de la que salió esta.
 
-     EL PAR ES EL PROTAGONISTA de esta app. Una primera versión lo tuvo bajo de
-     croma y corrido hacia el ladrillo (hue 34) para no chocar con el rojo de
-     error de Onyx; el resultado tiraba a naranja y no decía lo que tiene que
-     decir. Acá el criterio se invirtió: la ganancia y la pérdida mandan, y las
-     cuestiones del sistema —`--ox-danger` incluido— se quedan como vienen. El
-     botón de borrar pasa a ser el rojo más pálido de la pantalla y está bien:
-     el error es del sistema, la pérdida es de la app.
+     EL ROJO ES EL DE ONYX. Hubo una etapa con un rojo propio, intenso y más
+     saturado que el de error, para que la pérdida "pegara". Se volvió al
+     sistema (17 sep 2026, pedido de Fran): la app se quería más fiel a Onyx, y
+     que perder plata y fallar compartan tinta no confunde — el contexto dice
+     cuál es cuál. Si Onyx cambia su danger, Finway lo sigue sin tocar nada.
 
-     LOS DOS ESTÁN EMPAREJADOS, y no por tener el mismo número de croma. En sRGB
-     el verde no llega tan lejos que el rojo: a L=58% el rojo aguanta hasta
-     0.235 y el verde apenas 0.150, así que igualar la cifra dejaría el verde
-     apagado al lado del rojo. Lo que se iguala es la LUMINANCIA y el PORCENTAJE
-     del techo de cada matiz (~92%): los dos igual de cerca de su borde, los dos
-     igual de plenos.
+     EL VERDE SE EMPAREJA CON ESE ROJO, y no por el número de croma. En sRGB el
+     verde no llega tan lejos como el rojo, así que igualar la cifra lo dejaría
+     apagado. Se iguala la LUMINANCIA y el PORCENTAJE del techo de croma de cada
+     matiz: el danger de Onyx está al 57% del suyo a L=64%, y este verde al 57%
+     del suyo a L=62% (misma luminancia relativa). Si cambia el danger, esta
+     cuenta hay que rehacerla: el de humo mide que sigan pesando igual.
 
      Y los gastos de la LISTA siguen en texto neutro con su signo −: el rojo
-     aparece en los agregados (el balance, el donut, las barras) y en los
+     aparece en los agregados (el balance, la línea, las barras) y en los
      negativos. Teñir cada fila de una lista que es casi toda gastos convierte
      al rojo en el color del fondo. */
-  --fw-in:   oklch(58% .142 152);   /* ingreso — lo que entra  · #1e914e */
-  --fw-out:  oklch(58% .219 27);    /* gasto   — lo que sale   · #df2326 */
+  --fw-in:   oklch(62% .093 152);   /* ingreso — lo que entra  · #59966a */
+  --fw-out:  var(--ox-danger);      /* gasto   — lo que sale   · #d4676b */
 
-  /* El balance no tiene color propio: ES verde o rojo según su signo, que es
-     la única pregunta que se le hace. Antes era el amarillo de la terna, un
-     tercer color que había que aprender. */
+  /* El balance no tiene color propio: ES verde o rojo según su signo. */
   --fw-bal:  var(--fw-in);
 
-  /* La misma tinta, un escalón más clara, SOLO para texto chico. El par de
-     arriba está calibrado para que la pérdida pegue, y a 26px del balance pega;
-     pero el readout de los gráficos es de 11px y ahí 3,77:1 contra la card no
-     alcanza para leer cómodo. No es otro color: es el mismo con la luminancia
-     justa para pasar 4,5:1. Las masas —donut, barras, área— siguen con el par
-     pleno, que es donde el color grita. */
-  --fw-in-text:  oklch(59% .142 152);
-  --fw-out-text: oklch(63% .219 27);
+  /* Para texto chico (el readout de 11px). Con el par de Onyx el contraste ya
+     pasa 4,5:1 contra la card, así que son el mismo color; quedan como tokens
+     aparte para que endurecer el par no obligue a buscar cada texto. */
+  --fw-in-text:  var(--fw-in);
+  --fw-out-text: var(--fw-out);
 
-  --fw-in-dim:   oklch(58% .142 152 / .55);
-  --fw-out-dim:  oklch(58% .219 27 / .55);
+  --fw-in-dim:   oklch(62% .093 152 / .55);
+  --fw-out-dim:  rgb(var(--ox-danger-rgb) / .55);
 
-  --fw-in-wash:  oklch(58% .142 152 / .12);
-  --fw-out-wash: oklch(58% .219 27 / .12);
+  --fw-in-wash:  oklch(62% .093 152 / .12);
+  --fw-out-wash: var(--ox-danger-wash);
 
-  /* La marca. Acromática como el resto del shell: la "F" se dibuja con la
-     escalera de texto de Onyx y no con los colores del dominio. Para volver a
-     la marca CMY de FinWatch alcanza con estas dos líneas:
-       --fw-mark-a: #2EE6FF;  --fw-mark-b: #FF2DB8;
-     (y las mismas dos en el <style> del splash de index.html, que pinta antes
-     de que existan los tokens). */
+  /* La marca, acromática como el resto del shell: la "F" se dibuja con la
+     escalera de texto de Onyx. */
   --fw-mark-a: var(--ox-text);
   --fw-mark-b: var(--ox-text-3);
 }
@@ -75,7 +63,6 @@
    Se dispara cuando la app guarda: el movimiento ES el acuse de recibo. */
 .fw-brand__mark { display: inline-flex; }
 .fw-brand__mark svg { width: 17px; height: 17px; display: block; }
-.fw-brand__version { margin-left: var(--ox-1); font-size: var(--ox-fs-10); }
 
 .fw-mark .fm-arm { transform-origin: 9px 24px; }
 .fw-mark.is-active .fm-a1 { animation: fw-pulse .52s var(--ox-ease-both) 0s 2; }
@@ -103,53 +90,24 @@
 .fw-monthnav__label .fw-year { color: var(--ox-text-3); font-weight: var(--ox-w-regular); }
 
 /* ── KPIs ───────────────────────────────────────────────────────────────────
-   Cuatro cifras, una sola fila. El balance es la que importa y por eso es la
-   única que crece: la jerarquía se lee antes de leer los números. */
+   Las cifras sueltas de Onyx (.ox-stat), sin tarjeta ni canto de color: igual
+   que la fila de números del Inicio de la plantilla. El color vive en la cifra,
+   que es el dato; el balance es la única que crece. */
 .fw-kpis {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--ox-3);
-  margin-bottom: var(--ox-4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--ox-4) 40px;
+  margin-bottom: 28px;
 }
-.fw-kpi {
-  padding: var(--ox-3) var(--ox-4);
-  border-radius: var(--ox-r-md);
-  background: var(--ox-s2);
-  --ox-surface: var(--ox-s2);
-  box-shadow: var(--ox-hairline), var(--ox-e1);
-  position: relative;
-  overflow: hidden;
-  transition: var(--tr-surface);
-}
-/* El canto de color: dice de qué habla la cifra sin teñirla entera. */
-.fw-kpi::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 2px;
-  background: var(--fw-kpi-color, transparent);
-  transition: var(--tr-fade);
-}
-.fw-kpi--in   { --fw-kpi-color: var(--fw-in) }
-.fw-kpi--out  { --fw-kpi-color: var(--fw-out) }
-.fw-kpi--bal  { --fw-kpi-color: var(--fw-bal) }
-.fw-kpi--rate { --fw-kpi-color: var(--ox-line-3) }
-/* El canto del balance sigue al signo, igual que su cifra. Con el canto fijo
-   en verde y el número en rojo, la tarjeta decía dos cosas distintas a la vez
-   — y el canto es lo que se ve de reojo, sin leer. */
-.fw-kpi--bal.is-negative { --fw-kpi-color: var(--fw-out) }
-
-.fw-kpi .ox-stat__value { font-variant-numeric: tabular-nums; transition: var(--tr-color) }
+.fw-kpi .ox-stat__value { transition: var(--tr-color) }
 .fw-kpi--in   .ox-stat__value { color: var(--fw-in) }
 .fw-kpi--out  .ox-stat__value { color: var(--fw-out) }
 .fw-kpi--bal  .ox-stat__value { color: var(--fw-bal); font-size: var(--ox-fs-26) }
-/* Un balance negativo no es un error del sistema: es una noticia. Por eso baja
-   de luminancia en vez de ponerse del rojo de fallo, que acá mentiría. */
 .fw-kpi--bal.is-negative .ox-stat__value { color: var(--fw-out) }
 .fw-kpi__sub {
   font-size: var(--ox-fs-11);
   color: var(--ox-text-4);
-  margin-top: 2px;
   animation: ox-in-fade var(--ox-t-3) var(--ox-ease) both;
 }
 
@@ -314,12 +272,12 @@
 .fw-amount { font-variant-numeric: tabular-nums; white-space: nowrap }
 .fw-amount--in  { color: var(--fw-in-text) }
 .fw-amount--out { color: var(--ox-text-2) }
-.fw-cat { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap }
+.fw-cat { white-space: nowrap; color: var(--ox-text-2) }
 .fw-note { color: var(--ox-text-3) }
 /* La fila que se está editando se marca con el canto, no con un baño de color:
    un fondo amarillo al 12% sobre la escalera oscura da una banda oliva que
    compite con los montos, que es lo único que hay que leer en esa fila. */
-.ox-tr.is-editing { background: rgb(255 255 255 / .03) }
+.ox-tr.is-editing { background: var(--ox-wash-1) }
 .ox-tr.is-editing td:first-child { box-shadow: inset 2px 0 0 var(--ox-accent) }
 
 /* ── Carga rápida (el inspector) ────────────────────────────────────────────
@@ -349,24 +307,26 @@
 }
 .fw-qa__banner-inner .ox-iconbtn { margin-left: auto; color: var(--ox-text-3) }
 
-/* El monto: el campo más grande de la app, en mono, teñido por el tipo.
-
-   Sin contorno. Lo que dice "acá se escribe" es el plano hundido, no una
-   línea alrededor: es la misma idea con la que Onyx separa planos —elevación,
-   no bordes— y en un campo de este tamaño el marco pesaba más que el número.
-   El foco tampoco dibuja un anillo: aclara el fondo. Suena poco para señalar
-   el foco, pero en un campo de texto el caret ya está parpadeando adentro, y
-   es el único control de la app que arranca enfocado. */
+/* El monto: el campo más grande de la app, en mono, con la cifra teñida por
+   el tipo. La CAJA es un .ox-input agrandado —hundido, con su hairline, y al
+   enfocarse el mismo anillo que cualquier campo de Onyx—; el anillo lo pone la
+   caja con :focus-within y no el <input> de adentro, que si no dibujaría el
+   suyo y quedarían dos concéntricos. */
 .fw-amountfield {
   display: flex;
   align-items: center;
   gap: var(--ox-2);
   padding: var(--ox-2) var(--ox-3);
-  border-radius: var(--ox-r-md);
+  border-radius: var(--ox-r-sm);
   background: var(--ox-sunken);
-  transition: background-color var(--ox-t-2) var(--ox-ease-soft);
+  box-shadow: inset 0 0 0 1px var(--ox-line);
+  transition: box-shadow var(--ox-t-2) var(--ox-ease-soft),
+              background-color var(--ox-t-2) var(--ox-ease-soft);
 }
-.fw-amountfield:focus-within { background: var(--ox-s2) }
+.fw-amountfield:focus-within {
+  background: var(--ox-bg);
+  box-shadow: inset 0 0 0 1px var(--ox-line-3), 0 0 0 3px var(--ox-wash-1);
+}
 .fw-amountfield--expense { --fw-field-color: var(--fw-out) }
 .fw-amountfield--income  { --fw-field-color: var(--fw-in) }
 .fw-amountfield__currency { font-size: var(--ox-fs-19); color: var(--ox-text-4) }
@@ -377,10 +337,7 @@
   outline: 0;
   background: transparent;
   color: var(--fw-field-color, var(--ox-text));
-  /* El cursor NO se tiñe con el tipo de movimiento. El caret hereda de `color`,
-     así que sin esto parpadea magenta sobre el gasto y cyan sobre el ingreso:
-     dice algo que ya dicen el segmentado, el número y el anillo, y encima se
-     mueve. El que escribe es uno solo y es blanco. */
+  /* El caret no se tiñe con el tipo: el que escribe es uno solo. */
   caret-color: var(--ox-text);
   font-family: var(--ox-mono);
   font-size: 23px;
@@ -388,11 +345,6 @@
   font-variant-numeric: tabular-nums;
   transition: var(--tr-color);
 }
-/* El anillo lo pone la CAJA, no el input. El focus ring de base.css se dibuja
-   alrededor del elemento enfocado —acá, el <input> de adentro— y quedaban dos
-   anillos concéntricos: el blanco del sistema encerrado dentro del magenta del
-   campo. Y en un campo de texto no alcanza con `:focus-visible` para evitarlo,
-   porque Chromium lo matchea también con el mouse. */
 .fw-amountfield__input:focus-visible { box-shadow: none; }
 .fw-amountfield__input::placeholder { color: var(--ox-text-4); font-weight: var(--ox-w-regular) }
 .fw-amountfield.is-shaking { animation: ox-shake .42s var(--ox-ease-both) }
@@ -411,24 +363,26 @@
   appearance: none;
 }
 
-/* Categorías: el color es el de la categoría, no el del acento — es un dato. */
+/* Categorías: chips de Onyx (.ox-chip) hechos botón. Acromáticos, como todo
+   lo que no es plata: la elegida se aclara y gana un hairline, igual que un
+   control prendido del sistema. El acento no se usa acá porque ya lo tiene el
+   botón de registrar, y hay uno solo por pantalla. */
 .fw-cats { display: flex; flex-wrap: wrap; gap: 5px }
 .fw-cat-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   height: 24px;
   padding: 0 var(--ox-2);
   border-radius: var(--ox-r-xs);
-  background: var(--ox-s2);
+  background: var(--ox-wash-1);
   color: var(--ox-text-3);
   font-size: var(--ox-fs-11);
+  font-weight: var(--ox-w-medium);
   cursor: pointer;
   transition: var(--tr-surface), var(--tr-color);
 }
-.fw-cat-btn:hover { background: var(--ox-s3); color: var(--ox-text-2) }
-.fw-cat-btn.is-on { background: var(--fw-cat); color: var(--ox-bg); font-weight: var(--ox-w-medium) }
-.fw-cat-btn.is-on .fw-dot { background: var(--ox-bg) !important; opacity: .55 }
+.fw-cat-btn:hover { background: var(--ox-wash-2); color: var(--ox-text-2) }
+.fw-cat-btn.is-on { background: var(--ox-wash-3); color: var(--ox-text); box-shadow: inset 0 0 0 1px var(--ox-line-3) }
 
 .fw-qa__row { display: flex; gap: var(--ox-2) }
 .fw-qa__row > .ox-input { flex: 1 1 auto; min-width: 0 }

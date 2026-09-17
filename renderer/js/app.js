@@ -149,7 +149,6 @@ async function boot() {
     return;
   }
 
-  document.getElementById('brand-version').textContent = `v${S.info.version}`;
   document.getElementById('rail-foot').innerHTML =
     `<div class="ox-meta">${S.moves.length} movimientos guardados</div>`;
 

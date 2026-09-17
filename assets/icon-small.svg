@@ -1,22 +1,20 @@
 <!-- ═══════════════════════════════════════════════════════════════════════════
      FINWAY — el ícono para tamaños chicos (≤ 24 px)
-     El mismo desvío, con el glifo agrandado ~30% y el trazo a 25.
-
-     Por qué existe una segunda versión: la baldosa va al 100% del lienzo —es la
-     regla, y es la que hace que el ícono no se vea más chico que el de al lado
-     en la barra de tareas—, pero a 16 px eso deja el glifo en unos 10 píxeles y
-     el tronco en poco más de uno. Agrandando el dibujo dentro de la MISMA
-     baldosa, el mismo ícono pasa a tener 13 y el trazo llega a dos píxeles
-     enteros, que es la diferencia entre leerse y ser una mancha.
-
-     Geometría escalada 1,3× desde el centro (128,128). Si se toca el master
-     grande, hay que rehacer esta cuenta o los dos íconos dejan de ser el mismo.
+     La misma F, agrandada ~30% dentro de la misma baldosa: a 16 px el master
+     grande deja los brazos en poco más de un píxel y se empastan.
      ═══════════════════════════════════════════════════════════════════════════ -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e9ebee"/>
+      <stop offset="1" stop-color="#6e737b"/>
+    </linearGradient>
+  </defs>
   <rect width="256" height="256" rx="48" fill="#101216"/>
-  <g fill="none" stroke-width="25" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M32 128h62" stroke="#e9ebee"/>
-    <path d="M94 128 167 55h57" stroke="#1e914e"/>
-    <path d="M94 128 167 201h57" stroke="#df2326"/>
+  <g transform="translate(-23.92 -25.50) scale(6.33)">
+    <rect x="9" y="9" width="5.5" height="30.5" rx="2.75" fill="url(#g)"/>
+    <rect x="17.3" y="9" width="21.7" height="5.5" rx="2.75" fill="#e9ebee"/>
+    <rect x="17.3" y="17.3" width="14" height="5.5" rx="2.75" fill="#a4a9b0"/>
+    <rect x="17.3" y="25.6" width="18" height="5.5" rx="2.75" fill="#6e737b"/>
   </g>
 </svg>

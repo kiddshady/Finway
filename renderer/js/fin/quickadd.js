@@ -32,10 +32,7 @@ const S = {
 /* ══ Markup ══════════════════════════════════════════════════════════════════ */
 
 const catsHTML = () => catsFor(S.type).map((c) => `
-  <button class="fw-cat-btn${c.id === S.category ? ' is-on' : ''}" data-cat="${esc(c.id)}"
-          style="--fw-cat:${c.color}">
-    <span class="fw-dot" style="background:${c.color}"></span>${esc(c.label)}
-  </button>`).join('');
+  <button class="fw-cat-btn${c.id === S.category ? ' is-on' : ''}" data-cat="${esc(c.id)}">${esc(c.label)}</button>`).join('');
 
 export function quickAddHTML() {
   const isIncome = S.type === 'income';

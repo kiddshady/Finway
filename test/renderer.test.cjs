@@ -126,13 +126,8 @@ app.whenReady().then(async () => {
   ok('los <i data-icon> se reemplazaron por SVG', !(await js(`!!document.querySelector('i[data-icon]')`)));
   ok('la vista inicial pintó algo', (await js(`document.getElementById('view').children.length`)) > 0);
   ok('la marca está en la titlebar', dentro(await rect('#brand-mark svg')));
-  /* Ojo con lo que afirma esto: acá app.getVersion() devuelve la de Electron,
-     porque bajo `electron test/renderer.test.cjs` el app path no es el del
-     proyecto. Lo que se prueba es que el viaje main → IPC → titlebar funciona
-     y que el renderer pinta lo que le llega, no CUÁL número es. */
-  ok('la titlebar pinta la versión que le pasó el main',
-    /^v\d+\.\d+\.\d+$/.test(await js(`document.getElementById('brand-version').textContent`)),
-    await js(`document.getElementById('brand-version').textContent`));
+  // La titlebar es la de Onyx: marca y nombre. La versión vive en Ajustes.
+  ok('la titlebar no muestra la versión', !(await js(`!!document.getElementById('brand-version')`)));
 
   console.log('\n2. El color que la app le manda a su propia ventana');
   const hex = await js(`(async () => (await import('./js/ui.js')).colorToken('--ox-bg'))()`);
@@ -153,34 +148,21 @@ app.whenReady().then(async () => {
   ok('las barras tienen altura', barras >= 2, String(barras));
   ok('el eje de las barras muestra 6 meses', (await js(`document.querySelectorAll('.fw-bar-month').length`)) === 6);
 
-  /* Los colores de categoría son lo único que ata cada gajo del donut con su
-     renglón de la leyenda, así que tienen que ser DISTINGUIBLES — no alcanza
-     con que sean distintos. Un test que compara strings encuentra once colores
-     distintos en una rampa de grises casi iguales y da verde igual: es
-     exactamente el que dejó pasar la rampa monocroma ilegible.
-     Acá se mide la distancia perceptual real en Oklab. */
-  const trazos = await js(`[...document.querySelectorAll('.fw-donut__seg')].map((s) => getComputedStyle(s).stroke)`);
-  ok('cada segmento resuelve a un color real',
-    trazos.length > 0 && trazos.every((t) => /^(rgb|oklch|color)/.test(t)), trazos.join(' | '));
-
-  // Los once colores se leen de los chips del formulario, donde están todos.
-  await click('[data-view="movimientos"]');
-  await sleep(700);
-  const rgbs = await js(`(() => {
+  /* Las categorías NO tienen color: el gris de cada gajo sale de su PUESTO en
+     el mes. Lo que tiene que valer es que la escalera baje de verdad —el gajo
+     más grande el más claro— y que dos vecinos se distingan. Se mide la
+     luminancia Oklab de lo que se pinta, no los strings: once strings distintos
+     pueden ser once grises iguales, que es lo que ya falló una vez. */
+  const labDe = async (sel, prop) => js(`(() => {
     const cv = document.createElement('canvas'); cv.width = cv.height = 1;
     const cx = cv.getContext('2d', { willReadFrequently: true });
-    const leer = (color) => { cx.clearRect(0, 0, 1, 1); cx.fillStyle = color; cx.fillRect(0, 0, 1, 1);
-      const d = cx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; };
-    const cs = getComputedStyle(document.documentElement);
-    return {
-      cats: [...document.querySelectorAll('#qa-cats .fw-dot')].map((d) => leer(getComputedStyle(d).backgroundColor)),
-      sem: [leer(cs.getPropertyValue('--fw-in')), leer(cs.getPropertyValue('--fw-out'))],
-    };
+    return [...document.querySelectorAll(${JSON.stringify(sel)})].map((el) => {
+      cx.clearRect(0, 0, 1, 1); cx.fillStyle = getComputedStyle(el)[${JSON.stringify(prop)}]; cx.fillRect(0, 0, 1, 1);
+      const d = cx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; });
   })()`);
-
   const aLab = ([r, g, b]) => {
-    const s = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-    const [R, G, B] = [s(r), s(g), s(b)];
+    const f = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    const [R, G, B] = [f(r), f(g), f(b)];
     const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
     const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
     const q = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
@@ -188,47 +170,38 @@ app.whenReady().then(async () => {
       1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * q,
       0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * q];
   };
-  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  const croma = ([, a, b]) => Math.hypot(a, b);
+  const gajos = (await labDe('.fw-donut__seg', 'stroke')).map(aLab);
+  ok('los gajos del donut son grises (sin croma)',
+    gajos.length > 0 && gajos.every((g) => croma(g) < 0.03), gajos.map((g) => croma(g).toFixed(3)).join(' '));
+  ok('y bajan de a escalones visibles, del más grande al más chico',
+    gajos.every((g, i) => i === 0 || gajos[i - 1][0] - g[0] >= 0.04), gajos.map((g) => g[0].toFixed(3)).join(' > '));
+  const leyenda = (await labDe('.fw-legend__item .fw-dot', 'backgroundColor')).map(aLab);
+  ok('la leyenda repite el gris de su gajo, en el mismo orden',
+    leyenda.length === gajos.length && leyenda.every((c, i) => Math.abs(c[0] - gajos[i][0]) < 0.01));
 
-  ok('los once colores de categoría llegaron', rgbs.cats.length === 11, String(rgbs.cats.length));
-  const labs = rgbs.cats.map(aLab);
-  let peor = Infinity; let quienes = '';
-  for (let i = 0; i < labs.length; i++) {
-    for (let j = i + 1; j < labs.length; j++) {
-      const d = dist(labs[i], labs[j]);
-      if (d < peor) { peor = d; quienes = `${i} vs ${j}`; }
-    }
-  }
-  /* 0.04 es "el mismo color con otro nombre" (es lo que separa al rojo del
-     gasto del rojo del fallo, y ya cuesta). Para gajos de un donut se pide más
-     del doble. */
-  ok(`dos categorías nunca se parecen demasiado (mínima ${peor.toFixed(3)})`,
-    peor >= 0.085, `el par más cercano es ${quienes}`);
+  await click('[data-view="movimientos"]');
+  await sleep(700);
+  ok('están los once chips de categoría', (await js(`document.querySelectorAll('#qa-cats .fw-cat-btn').length`)) === 11);
+  const chips = (await labDe('#qa-cats .fw-cat-btn', 'backgroundColor')).map(aLab);
+  ok('y ninguno lleva color', chips.every((c) => croma(c) < 0.03));
+  ok('la tabla no pinta puntitos de categoría', !(await js(`!!document.querySelector('#mv-rows .fw-dot')`)));
 
-  const sem = rgbs.sem.map(aLab);
-  let peorSem = Infinity;
-  for (const c of labs) for (const s of sem) peorSem = Math.min(peorSem, dist(c, s));
-  ok(`ninguna categoría se parece a "entra" ni a "sale" (mínima ${peorSem.toFixed(3)})`,
-    peorSem >= 0.085);
-
-  /* El canto del balance sigue al signo. Con datos sembrados el mes actual da
-     positivo; el anterior tiene un gasto y ningún ingreso, así que da negativo
-     y el canto tiene que cambiar con él — es lo que se ve de reojo, sin leer. */
-  // El bloque de categorías dejó la app en Movimientos: los KPIs viven en Resumen.
+  /* El balance toma el color de su signo. Con datos sembrados el mes actual da
+     positivo; el anterior tiene un gasto y ningún ingreso, así que da negativo. */
   await click('[data-view="resumen"]');
   await sleep(800);
-  const cantoBal = () => js(`getComputedStyle(document.querySelector('.fw-kpi--bal'), '::before').backgroundColor`);
+  ok('los KPIs son cifras sueltas de Onyx, sin tarjeta',
+    await js(`[...document.querySelectorAll('.fw-kpi')].every((k) => getComputedStyle(k).backgroundColor === 'rgba(0, 0, 0, 0)' && getComputedStyle(k).boxShadow === 'none')`));
   const valorBal = () => js(`getComputedStyle(document.querySelector('.fw-kpi--bal .ox-stat__value')).color`);
-  const balPos = { canto: await cantoBal(), valor: await valorBal() };
-  ok('con balance positivo, el canto acompaña a la cifra',
-    balPos.canto === balPos.valor, `canto ${balPos.canto} · cifra ${balPos.valor}`);
+  const balPos = await valorBal();
   await click('[data-month="-1"]');
   await sleep(800);
-  const balNeg = { canto: await cantoBal(), valor: await valorBal() };
-  ok('con balance negativo la cifra cambia de color', balNeg.valor !== balPos.valor,
-    `${balPos.valor} → ${balNeg.valor}`);
-  ok('y el canto cambia con ella', balNeg.canto === balNeg.valor,
-    `canto ${balNeg.canto} · cifra ${balNeg.valor}`);
+  const balNeg = await valorBal();
+  ok('con balance negativo la cifra cambia de color', balNeg !== balPos, `${balPos} -> ${balNeg}`);
+  const danger = await js(`(() => { const p = document.createElement('span'); p.style.color = 'var(--ox-danger)';
+    document.body.appendChild(p); const c = getComputedStyle(p).color; p.remove(); return c; })()`);
+  ok('y el rojo es el danger de Onyx', balNeg === danger, `${balNeg} vs ${danger}`);
   await click('[data-month="hoy"]');
   await sleep(800);
 
@@ -350,18 +323,18 @@ app.whenReady().then(async () => {
   })()`);
   ok('y hay una regla que se lo apaga cuando el foco viene del teclado',
     reglaFoco === 'none', `modalidad de este foco: ${foco.focusVisible ? 'teclado' : 'puntero'} · regla: ${reglaFoco}`);
-  /* La caja tampoco lleva contorno: lo que dice "acá se escribe" es el plano
-     hundido. El foco se marca aclarando el fondo, no con un anillo. */
+  /* La caja es un .ox-input agrandado: hairline en reposo y, con el foco, el
+     mismo anillo que cualquier campo de Onyx. */
   const caja = await js(`(() => { const s = getComputedStyle(document.getElementById('qa-amountfield'));
     return { sombra: s.boxShadow, fondo: s.backgroundColor }; })()`);
-  ok('la caja del monto no dibuja contorno', caja.sombra === 'none', String(caja.sombra));
+  ok('con el foco, la caja lleva el anillo de Onyx', /0px 0px 0px 3px/.test(caja.sombra), String(caja.sombra));
   ok('el cursor es blanco, no del color del tipo',
     foco.caret !== foco.texto, `caret=${foco.caret} texto=${foco.texto}`);
   await js(`document.getElementById('qa-amount').blur()`);
   await sleep(400);
-  const sinFoco = await js(`getComputedStyle(document.getElementById('qa-amountfield')).backgroundColor`);
-  ok('pero el foco se nota igual: el fondo cambia',
-    caja.fondo !== sinFoco, `con foco ${caja.fondo} · sin foco ${sinFoco}`);
+  const sinFoco = await js(`getComputedStyle(document.getElementById('qa-amountfield')).boxShadow`);
+  ok('y sin foco vuelve a su hairline, sin el anillo',
+    sinFoco !== 'none' && !/0px 0px 0px 3px/.test(sinFoco), String(sinFoco));
 
   /* El botón de registrar es un botón común de Onyx: sin teclas adentro. La
      que estaba se leía como un segundo botón metido en el primero. */
@@ -619,6 +592,38 @@ app.whenReady().then(async () => {
   ok('y deja tres filas vacías en $ 0', (await js(`document.querySelectorAll('.fw-calc__row').length`)) === 3
     && (await totalCalc()) === '$ 0', await totalCalc());
 
+  await click('[data-view="movimientos"]');
+  await sleep(700);
+
+  console.log('\n9-quater. El encabezado de la tabla queda clavado arriba');
+  /* El th sticky se enganchaba al borde del CONTENIDO del scroller, debajo del
+     padding del esfumado: al scrollear bajaba con la tabla y las filas pasaban
+     por el hueco de arriba, por encima de los títulos. Con los datos del humo
+     la tabla no scrollea, así que se clonan filas solo en el DOM. */
+  const clavado = await js(`(async () => {
+    const body = document.getElementById('mv-rows');
+    const fila = body.querySelector('.ox-tr');
+    for (let i = 0; i < 60; i++) body.appendChild(fila.cloneNode(true));
+    const sc = body.closest('.ox-scroll');
+    const th = sc.querySelector('th');
+    const antes = th.getBoundingClientRect().top;
+    sc.scrollTop = 400;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const caja = sc.getBoundingClientRect().top;
+    const t = th.getBoundingClientRect();
+    const asoman = [...body.querySelectorAll('.ox-tr')].filter((f) => {
+      // Lo que se VE de la fila entre el borde del scroll y los títulos.
+      const r = f.getBoundingClientRect(); return Math.min(r.bottom, t.top) - Math.max(r.top, caja) > 1; }).length;
+    const res = { antes, despues: t.top, caja, asoman, scrolleo: sc.scrollTop };
+    sc.scrollTop = 0;
+    return res;
+  })()`);
+  ok('la tabla de verdad scrolleó', clavado.scrolleo > 0, JSON.stringify(clavado));
+  ok('el encabezado no se movió al scrollear', Math.abs(clavado.antes - clavado.despues) < 1, JSON.stringify(clavado));
+  ok('y está pegado al borde de arriba del scroll', Math.abs(clavado.despues - clavado.caja) < 1, JSON.stringify(clavado));
+  ok('ninguna fila asoma por encima de los títulos', clavado.asoman === 0, JSON.stringify(clavado));
+  await click('[data-view="resumen"]');
+  await sleep(500);
   await click('[data-view="movimientos"]');
   await sleep(700);
 
