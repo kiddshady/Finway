@@ -174,9 +174,15 @@ workflow de [.github/workflows/release.yml](.github/workflows/release.yml) en un
 runner de Windows:
 
 ```
-npm version minor        # (o patch / major) bumpea package.json y crea el tag vX.Y.Z
-git push --follow-tags   # dispara el build; el Release aparece en unos minutos
+npm version minor -m "Finway %s: qué trae"   # (o patch / major) bumpea y crea el tag vX.Y.Z
+git push --follow-tags                       # dispara el build; el Release aparece en unos minutos
 ```
+
+El cuerpo del mensaje del tag (`git tag -a` con más de una línea, o editarlo
+después) son las notas del Release. El workflow crea el borrador **antes** de
+armar el instalador —si lo creara electron-builder, sus subidas en paralelo
+harían un borrador cada una— y lo publica recién con los tres archivos arriba:
+un borrador no cuenta como actualización, así nadie baja un release a medias.
 
 El workflow se niega si el tag no coincide con el `version` de package.json: el
 instalador y el `latest.yml` salen del package.json, y un tag desfasado publicaría

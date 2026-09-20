@@ -41,9 +41,30 @@ jobs:
 
       - run: npm test
 
-      - name: Instalador + Release
+      # El borrador se crea ACÁ y no lo crea electron-builder: sube el
+      # instalador, el blockmap y el latest.yml en paralelo, y cada subida
+      # busca el release por su cuenta. En el primer intento ninguna lo
+      # encontró y cada una creó el suyo: dos borradores para el mismo tag,
+      # con los archivos repartidos. Con el borrador ya existente, todas
+      # caen en el mismo. Las notas salen del mensaje del tag.
+      - name: Crear el borrador del Release
+        shell: bash
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1             || gh release create "${GITHUB_REF_NAME}" --draft --verify-tag                  --title "Finway ${GITHUB_REF_NAME#v}"                  --notes "$(git tag -l --format='%(contents:body)' "${GITHUB_REF_NAME}")"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Instalador + subida al Release
         run: npm run release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - run: npm run check-dist
+
+      # Recién con todo arriba se publica: un borrador no cuenta como
+      # actualización, así que nadie puede bajar un release a medio subir.
+      - name: Publicar el Release
+        shell: bash
+        run: gh release edit "${GITHUB_REF_NAME}" --draft=false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
