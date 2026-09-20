@@ -36,6 +36,7 @@ const fs = require('fs');
 const path = require('path');
 const ipc = require('./src/ipc.cjs');
 const store = require('./src/store.cjs');
+const updater = require('./src/updater.cjs');
 
 /* ── Una sola instancia ──────────────────────────────────────────────────────
    Con el tray, cerrar la ventana no mata la app: queda viva, escondida. Sin
@@ -217,13 +218,25 @@ function crearTray() {
 
   tray = new Tray(icono);
   tray.setToolTip('Finway');
+  armarMenuTray();
+  // Un click simple muestra: el menú queda para el click derecho.
+  tray.on('click', mostrarVentana);
+}
+
+/* El menú se rearma porque tiene un ítem condicional: cuando hay una versión
+   nueva ya bajada, aparece "Instalar la X.Y.Z". Es la salida para quien nunca
+   pasa por Ajustes y vive con la app escondida en el tray. */
+function armarMenuTray() {
+  if (!tray) return;
+  const u = updater.actual();
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Mostrar Finway', click: mostrarVentana },
+    ...(u.state === 'ready'
+      ? [{ label: `Instalar la ${u.version}`, click: () => updater.instalar() }]
+      : []),
     { type: 'separator' },
     { label: 'Salir', click: () => { saliendo = true; app.quit(); } },
   ]));
-  // Un click simple muestra: el menú queda para el click derecho.
-  tray.on('click', mostrarVentana);
 }
 
 app.on('second-instance', mostrarVentana);
@@ -255,6 +268,12 @@ app.whenReady().then(async () => {
   ipc.register();
   createWindow(await loadWindowState());
   crearTray();
+  updater.init({
+    onStatus: (estado) => {
+      if (win && !win.isDestroyed()) win.webContents.send('update:status', estado);
+      armarMenuTray();
+    },
+  });
 });
 
 app.on('window-all-closed', () => {

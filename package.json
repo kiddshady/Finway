@@ -1,11 +1,16 @@
 {
   "name": "finway",
   "productName": "Finway",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Finway — registro de gastos e ingresos con análisis de balances.",
   "main": "main.cjs",
   "author": "Kidd Shady · Umbrovex Systems",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kiddshady/Finway.git"
+  },
+  "homepage": "https://github.com/kiddshady/Finway",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
@@ -13,7 +18,8 @@
     "smoke": "electron test/renderer.test.cjs",
     "icons": "electron tools/iconos.mjs",
     "dist": "electron-builder --win",
-    "check-dist": "node tools/verificar-paquete.mjs"
+    "check-dist": "node tools/verificar-paquete.mjs",
+    "release": "electron-builder --win --publish always"
   },
   "devDependencies": {
     "electron": "40.10.2",
@@ -23,6 +29,13 @@
     "appId": "com.kiddshady.finway",
     "productName": "Finway",
     "copyright": "© 2026 Kidd Shady · Umbrovex Systems",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "kiddshady",
+        "repo": "Finway"
+      }
+    ],
     "directories": {
       "output": "dist"
     },
@@ -54,5 +67,8 @@
       "createDesktopShortcut": true,
       "shortcutName": "Finway"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

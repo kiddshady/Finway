@@ -41,6 +41,19 @@ contextBridge.exposeInMainWorld('onyx', {
     save: (patch) => call('settings:save', patch),
   },
 
+  /** Actualizaciones: el estado llega por eventos; ver src/updater.cjs. */
+  update: {
+    /** Dispara una búsqueda y devuelve el estado del momento. */
+    check: () => ipcRenderer.invoke('update:check'),
+    /** Cierra e instala. Solo hace algo con una descarga terminada. */
+    install: () => ipcRenderer.send('update:install'),
+    onStatus: (cb) => {
+      const handler = (_e, estado) => cb(estado);
+      ipcRenderer.on('update:status', handler);
+      return () => ipcRenderer.off('update:status', handler);
+    },
+  },
+
   /** Documento suelto: un borrador, un caché, el último estado de la UI. */
   doc: {
     read: (name, fallback = null) => call('doc:read', name, fallback),

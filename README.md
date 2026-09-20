@@ -14,7 +14,8 @@ npm run check-dist # verifica que el paquete traiga todo lo que la app pide
 npm run icons      # regenera los PNG, el .ico y la hoja de control
 ```
 
-Tras cambios de código, `npm run dist` y reinstalar: la app instalada no ve el repo.
+La app instalada no ve el repo: un cambio le llega por un **Release** (ver
+[Actualizaciones](#actualizaciones)) o reinstalando lo que arma `npm run dist`.
 
 ## Traer los datos de FinWatch
 
@@ -36,9 +37,11 @@ descartan contándolas — un import no se aborta entero por una fila rota, avis
 src/store.cjs         escritura atómica, settings, docs y colecciones      ← Onyx
 src/movimientos.cjs   el dominio: alta, edición, respaldo e importación
 src/ipc.cjs           los canales, incluidos los de mov:*                  ← Onyx + dominio
+src/updater.cjs       busca, baja y avisa de una versión nueva             ← nació acá, no está en Onyx
 renderer/css/         tokens, base, shell, controles, superficies, overlays ← Onyx
 renderer/css/finway.css   el par verde/rojo y lo del dominio
 renderer/js/          icons, motion, overlays, router, ui, format          ← Onyx
+renderer/js/update.js el modal de "está lista" y el estado para Ajustes    ← nació acá, no está en Onyx
 renderer/js/fin/      format, categories, stats, charts, quickadd, views, ajustes, calculadora, state, mark
 renderer/js/app.js    lo que une las dos mitades
 ```
@@ -152,6 +155,38 @@ archivo. La segunda se va enseguida y la primera se muestra.
 El ícono del tray se arma con las tres resoluciones (16, 24 y 32) y no con el `.ico`:
 en Electron 40 `nativeImage` lee el `.ico` a 256 y Windows lo achicaría al tamaño del
 tray — justo el escalado que el master chico existe para evitar.
+
+## Actualizaciones
+
+La app instalada **se actualiza sola** desde los Releases de
+[github.com/kiddshady/Finway](https://github.com/kiddshady/Finway). A los 8 segundos
+de arrancar mira si hay una versión más nueva, la baja en silencio, y recién cuando
+está lista pregunta *¿Reiniciar ahora?*. Nunca reinicia sola. Si se elige *Más tarde*,
+queda un botón en **Ajustes → Acerca de**, un ítem *Instalar la X.Y.Z* en el menú del
+tray, y de todas formas se instala al salir desde el tray (o al apagar Windows).
+
+Corriendo desde el repo no se actualiza: `electron-updater` se niega con la app sin
+empaquetar, así que ni se le pide, y Ajustes lo dice.
+
+Lo que lee es el `latest.yml` que electron-builder deja junto al instalador en cada
+Release. **Publicar una versión** es bumpear y pushear el tag; el resto lo hace el
+workflow de [.github/workflows/release.yml](.github/workflows/release.yml) en un
+runner de Windows:
+
+```
+npm version minor        # (o patch / major) bumpea package.json y crea el tag vX.Y.Z
+git push --follow-tags   # dispara el build; el Release aparece en unos minutos
+```
+
+El workflow se niega si el tag no coincide con el `version` de package.json: el
+instalador y el `latest.yml` salen del package.json, y un tag desfasado publicaría
+una versión con otro número del que dice. Un Release marcado como *pre-release* o
+en borrador no cuenta como actualización.
+
+El renderer no tiene red ni fs: el updater vive entero en el main
+([src/updater.cjs](src/updater.cjs)) y le manda el estado por `update:status`;
+[renderer/js/update.js](renderer/js/update.js) lo refleja. Los dos nacieron acá y son
+candidatos a viajar a Onyx.
 
 ## Empaquetado
 

@@ -12,6 +12,7 @@ import { esc, head, paint, path as recortar, viewEl } from '../ui.js';
 import { fmtARS } from './format.js';
 import { exportAll, importBackup, S } from './state.js';
 import { monthTotals } from './stats.js';
+import * as Update from '../update.js';
 
 export function viewAjustes() {
   const meses = new Set(S.moves.map((m) => m.date.slice(0, 7)));
@@ -66,7 +67,10 @@ export function viewAjustes() {
                 <span class="ox-kv__v ox-mono">${esc(S.info?.version || '—')}</span></div>
               <div class="ox-kv"><span class="ox-kv__k">Electron</span>
                 <span class="ox-kv__v ox-mono">${esc(S.info?.electron || '—')}</span></div>
+              <div class="ox-kv"><span class="ox-kv__k">Actualizaciones</span>
+                <span class="ox-kv__v" id="aj-update-estado"></span></div>
             </div>
+            <div class="ox-card__foot" id="aj-update-foot"></div>
           </div>
         </section>
       </div>`,
@@ -75,6 +79,31 @@ export function viewAjustes() {
   const root = viewEl();
   root.querySelector('#aj-importar').addEventListener('click', importar);
   root.querySelector('#aj-exportar').addEventListener('click', exportar);
+
+  /* La fila de actualizaciones se repinta sola con cada estado que manda el
+     main (buscando → bajando 40% → lista). Se suelta al irse de la vista: si
+     no, cada visita sumaría un oyente más sobre un nodo que ya no existe. */
+  pintarUpdate(root, Update.estado);
+  Router.onLeave(Update.onChange((e) => pintarUpdate(root, e)));
+}
+
+function pintarUpdate(root, e) {
+  const estado = root.querySelector('#aj-update-estado');
+  const foot = root.querySelector('#aj-update-foot');
+  if (!estado || !foot) return;
+  estado.textContent = Update.describir(e);
+
+  const ocupado = e.state === 'checking' || e.state === 'downloading';
+  foot.innerHTML = e.state === 'ready'
+    ? `<button class="ox-btn ox-btn--primary ox-flashable" id="aj-update-instalar">
+         <i data-icon="download"></i> Reiniciar e instalar la ${esc(e.version)}
+       </button>`
+    : `<button class="ox-btn ox-btn--secondary ox-flashable" id="aj-update-buscar"${ocupado || e.state === 'dev' ? ' disabled' : ''}>
+         <i data-icon="retry"></i> Buscar actualizaciones
+       </button>`;
+  Icons.mount(foot);
+  foot.querySelector('#aj-update-instalar')?.addEventListener('click', Update.instalar);
+  foot.querySelector('#aj-update-buscar')?.addEventListener('click', Update.buscar);
 }
 
 async function importar() {

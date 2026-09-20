@@ -1,0 +1,49 @@
+# Publica un Release de GitHub con el instalador y el latest.yml que lee el
+# updater (src/updater.cjs). Se dispara al pushear un tag vX.Y.Z; el número del
+# tag tiene que coincidir con el `version` de package.json, porque el
+# instalador y el latest.yml salen de ahí, no del tag.
+#
+#   npm version minor          # bumpea package.json y crea el tag
+#   git push --follow-tags     # y esto dispara el build
+#
+# El GITHUB_TOKEN que usa electron-builder para subir es el del propio repo:
+# no hay que crear ningún secreto.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: El tag tiene que ser la versión del package.json
+        shell: bash
+        run: |
+          v="v$(node -p "require('./package.json').version")"
+          if [ "$v" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::el tag es ${GITHUB_REF_NAME} pero package.json dice $v"
+            exit 1
+          fi
+
+      - run: npm test
+
+      - name: Instalador + Release
+        run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: npm run check-dist

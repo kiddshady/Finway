@@ -18,6 +18,7 @@ import { loadAll, refresh, S, setOnChrome, setOnSaved } from './fin/state.js';
 import { focusCarga, viewMovimientos, viewResumen } from './fin/views.js';
 import { viewAjustes } from './fin/ajustes.js';
 import { cargarCalculadora, viewCalculadora } from './fin/calculadora.js';
+import { initUpdates } from './update.js';
 
 /* El shell es del framework: `window.onyx` significa lo mismo en todas las
    apps de Onyx. El dominio de esta vive en `window.fw` y lo usan los módulos
@@ -139,6 +140,7 @@ async function boot() {
   syncWindowColor();
   setOnSaved(pulseMark);
   setOnChrome(updateChrome);
+  initUpdates();
 
   try {
     await Promise.all([loadAll(), cargarCalculadora()]);
