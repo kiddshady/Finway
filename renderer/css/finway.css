@@ -10,6 +10,10 @@
    Todo lo demás —editar, hoy, el día elegido, el foco— va con el acento o con
    la escalera de grises. Así el color nunca decora: si algo está teñido, es
    porque sin tinta no se distinguiría.
+
+   La otra tinta es la de las CATEGORÍAS (ver categories.js): cada una tiene su
+   color y aparece donde identifica a la categoría —gajos, líneas de la
+   tendencia, el puntito de chips y filas—, nunca en una cifra.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -110,6 +114,7 @@
   padding-bottom: var(--ox-5);
 }
 .fw-charts > .fw-card--wide { grid-column: 1 / -1; }
+.fw-card__actions { margin-left: auto; }
 .fw-card__body { padding: var(--ox-3) var(--ox-4) var(--ox-4); }
 
 /* ── Piezas compartidas de los gráficos ─────────────────────────────────── */
@@ -259,11 +264,123 @@
 }
 .fw-bar-month.is-selected { fill: var(--ox-text); font-weight: var(--ox-w-semi) }
 
+/* ── Tendencia por categoría ────────────────────────────────────────────────
+   Todo lo que cambia al elegir categorías viaja por CSS: el `d` de cada línea
+   y el `cy` de sus puntos transicionan (ver trend.js). */
+.fw-trend__cats { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: var(--ox-3) }
+.fw-trend__all { margin-left: auto }
+
+/* Chip de categoría prendible. Prendido lleva un baño de SU color y el texto
+   pleno; apagado queda en la escalera de grises con el punto hueco, así se lee
+   de un vistazo qué está en el gráfico y qué no. */
+.fw-tcat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 var(--ox-2);
+  border: 0;
+  appearance: none;
+  border-radius: var(--ox-r-xs);
+  background: var(--ox-wash-1);
+  color: var(--ox-text-4);
+  font-size: var(--ox-fs-11);
+  font-weight: var(--ox-w-medium);
+  cursor: pointer;
+  transition: var(--tr-surface), var(--tr-color), opacity var(--ox-t-2) var(--ox-ease-soft);
+}
+.fw-tcat .fw-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--fw-cat);
+  transition: background-color var(--ox-t-2) var(--ox-ease-soft);
+}
+.fw-tcat:hover { background: var(--ox-wash-2); color: var(--ox-text-2) }
+.fw-tcat.is-on { background: color-mix(in oklab, var(--fw-cat) 15%, transparent); color: var(--ox-text) }
+.fw-tcat.is-on:hover { background: color-mix(in oklab, var(--fw-cat) 24%, transparent) }
+.fw-tcat.is-on .fw-dot { background: var(--fw-cat) }
+
+.fw-trend__stage { position: relative }
+.fw-trend__line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: fw-draw .9s var(--ox-ease) forwards;
+  transition: d .55s var(--ox-ease), stroke-width var(--ox-t-2) var(--ox-ease-soft);
+}
+.fw-trend__pt {
+  stroke: var(--ox-s2);
+  stroke-width: 1.5;
+  animation: ox-in-fade .5s var(--ox-ease) .45s both;
+  transition: cy .55s var(--ox-ease), r var(--ox-t-2) var(--ox-ease-soft);
+}
+.fw-trend__pt.is-hot { r: 5 }
+.fw-trend__serie { transition: opacity var(--ox-t-3) var(--ox-ease-soft) }
+.fw-trend__serie.is-off { opacity: 0; pointer-events: none }
+.fw-trend.has-focus .fw-trend__serie:not(.is-focus):not(.is-off) { opacity: .16 }
+.fw-trend__serie.is-focus .fw-trend__line { stroke-width: 2.8 }
+
+.fw-trend__tick { transition: opacity var(--ox-t-3) var(--ox-ease-soft) }
+.fw-trend.is-none .fw-trend__tick { opacity: 0 }
+
+.fw-trend__hair { opacity: 0; transition: opacity var(--ox-t-1) var(--ox-ease-soft) }
+#trend-svg.is-hover .fw-trend__hair { opacity: 1 }
+
+/* El tooltip del mes. Se desliza de un mes al otro en vez de saltar, y del
+   lado donde hay lugar (.is-left lo cuelga a la izquierda de la guía). */
+.fw-trend__tip {
+  position: absolute;
+  top: 6px;
+  left: var(--tip-x, 0);
+  min-width: 180px;
+  padding: var(--ox-2) var(--ox-3);
+  border-radius: var(--ox-r-md);
+  background: var(--ox-s3);
+  box-shadow: var(--ox-hairline), var(--ox-e3);
+  font-size: var(--ox-fs-12);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(0, 4px);
+  transition: opacity var(--ox-t-2) var(--ox-ease-soft),
+              transform var(--ox-t-2) var(--ox-ease),
+              left .22s var(--ox-ease);
+}
+.fw-trend__tip.is-left { transform: translate(-100%, 4px) }
+.fw-trend__tip.is-open { opacity: 1; transform: translate(0, 0) }
+.fw-trend__tip.is-left.is-open { transform: translate(-100%, 0) }
+.fw-trend__tip-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ox-3);
+  margin-bottom: var(--ox-1);
+}
+.fw-trend__tip-total { margin-left: auto; color: var(--ox-text); font-variant-numeric: tabular-nums }
+.fw-trend__tip-row { display: flex; align-items: center; gap: var(--ox-2); padding: 1px 0 }
+.fw-trend__tip-name { flex: 1 1 auto; color: var(--ox-text-2) }
+.fw-trend__tip-amount { color: var(--ox-text-2); font-variant-numeric: tabular-nums }
+.fw-trend__tip-row.is-zero { opacity: .45 }
+
+.fw-trend__none {
+  position: absolute;
+  inset: 0 0 30px 56px;
+  display: grid;
+  place-items: center;
+  font-size: var(--ox-fs-12);
+  color: var(--ox-text-4);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--ox-t-3) var(--ox-ease-soft);
+}
+.fw-trend__none.is-open { opacity: 1 }
+.fw-trend__empty { padding: var(--ox-4) 0 }
+
 /* ── Lista de movimientos ───────────────────────────────────────────────── */
 /* Ingreso y gasto comparten tinta: los separa el signo, no el color. Las
    clases --in / --out se quedan porque son el gancho semántico de la fila. */
 .fw-amount { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ox-text-2) }
-.fw-cat { white-space: nowrap; color: var(--ox-text-2) }
+.fw-cat { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; color: var(--ox-text-2) }
 .fw-note { color: var(--ox-text-3) }
 /* La fila que se está editando se marca con el canto, no con un baño de color:
    un fondo amarillo al 12% sobre la escalera oscura da una banda oliva que
@@ -352,14 +469,15 @@
   appearance: none;
 }
 
-/* Categorías: chips de Onyx (.ox-chip) hechos botón. Acromáticos, como todo
-   lo que no es plata: la elegida se aclara y gana un hairline, igual que un
-   control prendido del sistema. El acento no se usa acá porque ya lo tiene el
-   botón de registrar, y hay uno solo por pantalla. */
+/* Categorías: chips de Onyx (.ox-chip) hechos botón, cada uno con el punto de
+   su color. La elegida se baña con ese color y gana su filo; el acento no se
+   usa acá porque ya lo tiene el botón de registrar, y hay uno solo por
+   pantalla. */
 .fw-cats { display: flex; flex-wrap: wrap; gap: 5px }
 .fw-cat-btn {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   height: 24px;
   padding: 0 var(--ox-2);
   border-radius: var(--ox-r-xs);
@@ -371,7 +489,12 @@
   transition: var(--tr-surface), var(--tr-color);
 }
 .fw-cat-btn:hover { background: var(--ox-wash-2); color: var(--ox-text-2) }
-.fw-cat-btn.is-on { background: var(--ox-wash-3); color: var(--ox-text); box-shadow: inset 0 0 0 1px var(--ox-line-3) }
+.fw-cat-btn .fw-dot { background: var(--fw-cat) }
+.fw-cat-btn.is-on {
+  background: color-mix(in oklab, var(--fw-cat) 16%, transparent);
+  color: var(--ox-text);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--fw-cat) 55%, transparent);
+}
 
 .fw-qa__row { display: flex; gap: var(--ox-2) }
 .fw-qa__row > .ox-input { flex: 1 1 auto; min-width: 0 }

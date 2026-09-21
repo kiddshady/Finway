@@ -12,12 +12,13 @@ import { Menu, Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
 import { bindSwitcher, stagger } from '../motion.js';
 import { esc, head, paint, viewEl } from '../ui.js';
-import { catLabel } from './categories.js';
+import { catColor, catLabel } from './categories.js';
 import { barsHTML, donutHTML, lineHTML, wireBars, wireDonut, wireLine } from './charts.js';
 import { currentMonth, dayLabel, fmtARS, monthTitle, shiftMonth, todayStr } from './format.js';
 import { markSVG } from './mark.js';
 import { QuickAdd, quickAddHTML, wireQuickAdd } from './quickadd.js';
-import { byCategory, cumulativeFlow, monthlyFlow, monthTotals, movesOf } from './stats.js';
+import { byCategory, categoryTrend, cumulativeFlow, monthlyFlow, monthTotals, movesOf } from './stats.js';
+import { trendHTML, wireTrend } from './trend.js';
 import { chromeChanged, exportAll, exportCsv, removeMove, S, saveMove } from './state.js';
 
 /* ══ Navegación de mes ═══════════════════════════════════════════════════════
@@ -64,6 +65,7 @@ export function viewResumen() {
   const prev = cumulativeFlow(S.moves, shiftMonth(S.month, -1));
   const isCurrent = S.month === currentMonth();
   const todayDay = isCurrent ? Number(todayStr().slice(8, 10)) : null;
+  const trend = categoryTrend(S.moves, S.month, S.trendRange);
 
   const kpi = (mod, label, value, sub = '') => `
     <div class="fw-kpi fw-kpi--${mod}${mod === 'bal' && t.balance < 0 ? ' is-negative' : ''}">
@@ -78,9 +80,9 @@ export function viewResumen() {
      "Drenaje acumulado" llevaba el punto del balance y lo que dibuja son
      gastos, y "Flujo" el del ingreso mostrando las dos cosas. El título dice
      de qué es la card; el color vive adentro, donde es un dato. */
-  const card = (title, body, wide = false) => `
-    <section class="ox-card${wide ? ' fw-card--wide' : ''}">
-      <div class="ox-card__head"><span class="ox-label">${title}</span></div>
+  const card = (title, body, wide = false, { id = '', actions = '' } = {}) => `
+    <section class="ox-card${wide ? ' fw-card--wide' : ''}"${id ? ` id="${id}"` : ''}>
+      <div class="ox-card__head"><span class="ox-label">${title}</span>${actions}</div>
       <div class="ox-card__body fw-card__body">${body}</div>
     </section>`;
 
@@ -102,6 +104,13 @@ export function viewResumen() {
            ${card('Gastos por categoría', donutHTML(cats, t.expense))}
            ${card('Drenaje acumulado', lineHTML(cur, prev, todayDay))}
            ${card('Flujo · últimos 6 meses', barsHTML(flow, S.month), true)}
+           ${card('Tendencia por categoría', trendHTML(trend, trendSel(trend)), true, {
+             id: 'trend-card',
+             actions: `<div class="ox-segmented fw-card__actions" id="trend-range">
+               ${TREND_RANGES.map((n) =>
+                 `<button class="ox-segmented__opt${S.trendRange === n ? ' is-active' : ''}" data-value="${n}">${n} meses</button>`).join('')}
+             </div>`,
+           })}
          </div>
        </div>`,
   );
@@ -111,7 +120,30 @@ export function viewResumen() {
   wireDonut(root, cats, t.expense);
   wireLine(root, cur, prev, todayDay);
   wireBars(root, flow, (ym) => { S.month = ym; chromeChanged(); Router.refresh(); });
+  wireTrend(root, trend, trendSel(trend), trendPick);
+
+  // El rango repinta SOLO la tendencia: remontar la vista entera reiniciaría
+  // las animaciones de entrada de los otros tres gráficos.
+  bindSwitcher(root.querySelector('#trend-range'), (value) => {
+    S.trendRange = Number(value);
+    const body = root.querySelector('#trend-card .ox-card__body');
+    const t = categoryTrend(S.moves, S.month, S.trendRange);
+    const sel = trendSel(t);
+    body.innerHTML = trendHTML(t, sel);
+    wireTrend(root, t, sel, trendPick);
+  });
 }
+
+/* ══ Tendencia: qué categorías se ven ════════════════════════════════════════
+   Mientras el usuario no toque nada, se ven TODAS — también las que aparezcan
+   al cambiar de mes o de rango. Apenas prende o apaga una, la elección pasa a
+   ser suya y se respeta tal cual hasta que cierre la app. */
+
+const TREND_RANGES = [6, 12];
+let trendPicked = null;
+
+const trendSel = (trend) => trendPicked ?? new Set(trend.series.map((s) => s.cat));
+const trendPick = (sel) => { trendPicked = sel; };
 
 /* ══ Vista: Movimientos ══════════════════════════════════════════════════════ */
 
@@ -138,7 +170,7 @@ function rowsHTML(list) {
     <tr class="ox-tr ox-in-fade${QuickAdd.editing?.id === m.id ? ' is-editing' : ''}" data-id="${esc(m.id)}">
       <td class="ox-mono ox-dim" style="width:1%;white-space:nowrap">${dayLabel(m.date)}</td>
       <td style="width:1%">
-        <span class="fw-cat">${esc(catLabel(m.category))}</span>
+        <span class="fw-cat"><span class="fw-dot" style="background:${catColor(m.category)}"></span>${esc(catLabel(m.category))}</span>
       </td>
       <td><div class="fw-note ox-truncate ox-copyable">${esc(m.note)}</div></td>
       <td class="ox-td--num fw-amount fw-amount--${m.type === 'income' ? 'in' : 'out'} ox-copyable">

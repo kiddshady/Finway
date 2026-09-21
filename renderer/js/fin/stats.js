@@ -51,3 +51,27 @@ export function cumulativeFlow(moves, ym) {
   let acc = 0;
   return perDay.map((v) => (acc += v));
 }
+
+/** Gasto mensual por categoría en los últimos n meses terminando en ym.
+    Devuelve { months: [ym…], series: [{ cat, values: [n], total }] }, con
+    solo las categorías que gastaron algo en la ventana, de mayor a menor. */
+export function categoryTrend(moves, ym, n = 6) {
+  const months = [];
+  for (let i = n - 1; i >= 0; i--) months.push(shiftMonth(ym, -i));
+  const idx = new Map(months.map((k, i) => [k, i]));
+
+  const acc = new Map();
+  for (const m of moves) {
+    if (m.type !== 'expense') continue;
+    const i = idx.get(monthKey(m.date));
+    if (i == null) continue;
+    if (!acc.has(m.category)) acc.set(m.category, new Array(n).fill(0));
+    acc.get(m.category)[i] += m.amount;
+  }
+
+  const series = [...acc.entries()]
+    .map(([cat, values]) => ({ cat, values, total: values.reduce((a, v) => a + v, 0) }))
+    .filter((s) => s.total > 0)
+    .sort((a, b) => b.total - a.total);
+  return { months, series };
+}

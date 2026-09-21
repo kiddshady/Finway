@@ -146,13 +146,12 @@ app.whenReady().then(async () => {
   ok('la línea del mes tiene trazo real', largo > 10, String(largo));
   const barras = await js(`[...document.querySelectorAll('.fw-bar')].filter(b => Number(b.getAttribute('height')) > 0).length`);
   ok('las barras tienen altura', barras >= 2, String(barras));
-  ok('el eje de las barras muestra 6 meses', (await js(`document.querySelectorAll('.fw-bar-month').length`)) === 6);
+  ok('el eje de las barras muestra 6 meses', (await js(`document.querySelectorAll('#bars-svg .fw-bar-month').length`)) === 6);
 
-  /* Las categorías NO tienen color: el gris de cada gajo sale de su PUESTO en
-     el mes. Lo que tiene que valer es que la escalera baje de verdad —el gajo
-     más grande el más claro— y que dos vecinos se distingan. Se mide la
-     luminancia Oklab de lo que se pinta, no los strings: once strings distintos
-     pueden ser once grises iguales, que es lo que ya falló una vez. */
+  /* Cada categoría tiene SU color (21 sep 2026). No alcanza con que los
+     strings sean distintos: once strings distintos pueden ser once colores
+     casi iguales, que es lo que ya falló con la rampa monocroma. Se mide la
+     distancia perceptual real en Oklab de lo que se pinta. */
   const labDe = async (sel, prop) => js(`(() => {
     const cv = document.createElement('canvas'); cv.width = cv.height = 1;
     const cx = cv.getContext('2d', { willReadFrequently: true });
@@ -171,21 +170,80 @@ app.whenReady().then(async () => {
       0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * q];
   };
   const croma = ([, a, b]) => Math.hypot(a, b);
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
   const gajos = (await labDe('.fw-donut__seg', 'stroke')).map(aLab);
-  ok('los gajos del donut son grises (sin croma)',
-    gajos.length > 0 && gajos.every((g) => croma(g) < 0.03), gajos.map((g) => croma(g).toFixed(3)).join(' '));
-  ok('y bajan de a escalones visibles, del más grande al más chico',
-    gajos.every((g, i) => i === 0 || gajos[i - 1][0] - g[0] >= 0.04), gajos.map((g) => g[0].toFixed(3)).join(' > '));
+  ok('los gajos del donut tienen color', gajos.length > 0 && gajos.some((g) => croma(g) > 0.05),
+    gajos.map((g) => croma(g).toFixed(3)).join(' '));
   const leyenda = (await labDe('.fw-legend__item .fw-dot', 'backgroundColor')).map(aLab);
-  ok('la leyenda repite el gris de su gajo, en el mismo orden',
-    leyenda.length === gajos.length && leyenda.every((c, i) => Math.abs(c[0] - gajos[i][0]) < 0.01));
+  ok('la leyenda repite el color de su gajo, en el mismo orden',
+    leyenda.length === gajos.length && leyenda.every((c, i) => dist(c, gajos[i]) < 0.01));
+
+  console.log('\n3b. Tendencia por categoría');
+  const tr = await js(`(() => {
+    const series = [...document.querySelectorAll('.fw-trend__serie')];
+    return {
+      chips: document.querySelectorAll('.fw-tcat').length,
+      series: series.length,
+      on: series.filter((g) => !g.classList.contains('is-off')).length,
+      meses: document.querySelectorAll('#trend-svg .fw-bar-month').length,
+    }; })()`);
+  ok('un chip y una línea por categoría con gasto', tr.chips === 3 && tr.series === 3, JSON.stringify(tr));
+  ok('arranca con todas prendidas', tr.on === 3, JSON.stringify(tr));
+  ok('y muestra 6 meses', tr.meses === 6, JSON.stringify(tr));
+  const alturaDe = (cat) => js(`parseFloat(getComputedStyle(document.querySelector('.fw-trend__serie[data-cat="${cat}"] .fw-trend__pt:last-of-type')).cy)`);
+  const piso = await js(`Number(document.querySelector('#trend-svg .fw-axis').getAttribute('y1'))`);
+  // Doble click deja SOLO esa: las demás bajan al piso y se apagan, y la
+  // escala se rehace sobre ella — su punto del mes queda arriba de todo.
+  await js(`document.querySelector('.fw-tcat[data-cat="transporte"]').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
+  await sleep(800);
+  const solo = await js(`[...document.querySelectorAll('.fw-trend__serie')].filter((g) => !g.classList.contains('is-off')).map((g) => g.dataset.cat)`);
+  ok('doble click en un chip deja solo esa categoría', solo.length === 1 && solo[0] === 'transporte', JSON.stringify(solo));
+  ok('la escala se rehace sobre ella (llega al techo)', (await alturaDe('transporte')) < 30, String(await alturaDe('transporte')));
+  ok('las apagadas bajan al piso', Math.abs((await alturaDe('comida')) - piso) < 1, `${await alturaDe('comida')} vs ${piso}`);
+  await click('.fw-tcat[data-cat="comida"]');
+  await sleep(700);
+  ok('un click prende otra más', (await js(`document.querySelectorAll('.fw-tcat.is-on').length`)) === 2);
+  await click('#trend-all');   // con dos de tres, «Todas»
+  await sleep(200);
+  ok('«Todas» prende todas', (await js(`document.querySelectorAll('.fw-tcat.is-on').length`)) === 3);
+  await click('#trend-all');   // y ahora dice «Ninguna»
+  await sleep(500);
+  ok('«Ninguna» las apaga y avisa', (await js(`document.querySelectorAll('.fw-tcat.is-on').length`)) === 0
+    && (await js(`document.querySelector('#trend-none').classList.contains('is-open')`)));
+  await click('#trend-all');
+  await click('#trend-range [data-value="12"]');
+  await sleep(600);
+  ok('el rango de 12 meses repinta solo la tendencia',
+    (await js(`document.querySelectorAll('#trend-svg .fw-bar-month').length`)) === 12
+    && (await js(`document.querySelectorAll('.fw-donut__seg').length`)) === 2);
+  // El tooltip: pasar el mouse por el último mes lo abre DENTRO de la card.
+  await js(`document.querySelector('#trend-card').scrollIntoView({ block: 'end' })`);
+  await sleep(300);
+  const svgR = await rect('#trend-svg');
+  win.webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(svgR.right - 30), y: Math.round(svgR.y + svgR.h / 2) });
+  await sleep(500);
+  const tipR = await rect('#trend-tip');
+  const cardR = await rect('#trend-card');
+  ok('el tooltip del mes se abre y cae dentro de la card',
+    (await js(`document.querySelector('#trend-tip').classList.contains('is-open')`)) && tipR.x >= cardR.x && tipR.right <= cardR.right + 1,
+    JSON.stringify({ tipR, cardR }));
+  win.webContents.sendInputEvent({ type: 'mouseMove', x: 5, y: 5 });
+  await click('#trend-range [data-value="6"]');
 
   await click('[data-view="movimientos"]');
   await sleep(700);
   ok('están los once chips de categoría', (await js(`document.querySelectorAll('#qa-cats .fw-cat-btn').length`)) === 11);
-  const chips = (await labDe('#qa-cats .fw-cat-btn', 'backgroundColor')).map(aLab);
-  ok('y ninguno lleva color', chips.every((c) => croma(c) < 0.03));
-  ok('la tabla no pinta puntitos de categoría', !(await js(`!!document.querySelector('#mv-rows .fw-dot')`)));
+  const puntos = (await labDe('#qa-cats .fw-cat-btn .fw-dot', 'backgroundColor')).map(aLab);
+  let minima = Infinity;
+  puntos.forEach((a, i) => puntos.forEach((b, j) => { if (j > i) minima = Math.min(minima, dist(a, b)); }));
+  ok(`el abanico separa a todas las categorías (mínima ${minima.toFixed(3)} ≥ 0.09)`, puntos.length === 11 && minima >= 0.09);
+  const sem = (await js(`(() => { const cs = getComputedStyle(document.documentElement);
+    const cv = document.createElement('canvas'); cv.width = cv.height = 1; const cx = cv.getContext('2d');
+    return ['--fw-in', '--fw-out'].map((v) => { cx.fillStyle = cs.getPropertyValue(v); cx.fillRect(0, 0, 1, 1);
+      const d = cx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; }); })()`)).map(aLab);
+  const contraPar = Math.min(...puntos.flatMap((p) => sem.map((q) => dist(p, q))));
+  ok(`y ninguna se confunde con el verde o el rojo (mínima ${contraPar.toFixed(3)} ≥ 0.08)`, contraPar >= 0.08);
+  ok('la tabla pinta el puntito de su categoría', await js(`!!document.querySelector('#mv-rows .fw-cat .fw-dot')`));
 
   /* Las cifras NO cambian de color con el signo (17 sep 2026): el balance da
      positivo este mes y negativo el anterior —el anterior tiene un gasto y

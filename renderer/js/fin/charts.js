@@ -12,7 +12,7 @@
    cada movimiento del mouse reiniciaría las animaciones de entrada.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-import { catLabel, rankShade } from './categories.js';
+import { catColor, catLabel } from './categories.js';
 import { fmtARS, fmtCompact, monthShort } from './format.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
@@ -34,25 +34,22 @@ export function donutHTML(data, total) {
 
   const ring = segs.length === 0
     ? `<circle cx="110" cy="110" r="78" fill="none" stroke="var(--ox-line-2)" stroke-width="26"/>`
-    : segs.map((s, i) => {
+    : segs.map((s) => {
         const dash = Math.max(s.pct - gap, 0.4);
-        /* El gris va por `style`, no por el atributo `stroke`: es oklch() con
-           var() adentro para seguir el matiz de la app, y var() NO se resuelve
-           en un atributo de presentación SVG — se resuelve en CSS. Con el
-           atributo, el segmento sale sin pintar. El gris es el del PUESTO del
-           gajo en el mes (data ya viene ordenada de mayor a menor). */
+        /* El color va por `style` y no por el atributo `stroke`: así es el
+           mismo camino que usa la tendencia, que sí necesita CSS para animar. */
         return `<circle class="fw-donut__seg" data-cat="${esc(s.cat)}"
                   cx="110" cy="110" r="78" fill="none" pathLength="100"
-                  style="stroke:${rankShade(i, segs.length)}" stroke-width="26"
+                  style="stroke:${catColor(s.cat)}" stroke-width="26"
                   stroke-dasharray="${dash.toFixed(2)} ${(100 - dash).toFixed(2)}"
                   stroke-dashoffset="${(25 - s.start).toFixed(2)}"/>`;
       }).join('');
 
   const legend = segs.length === 0
     ? `<div class="ox-meta" style="padding:3px var(--ox-2)">sin gastos este mes</div>`
-    : segs.map((s, i) => `
+    : segs.map((s) => `
         <div class="fw-legend__item" data-cat="${esc(s.cat)}">
-          <span class="fw-dot" style="background:${rankShade(i, segs.length)}"></span>
+          <span class="fw-dot" style="background:${catColor(s.cat)}"></span>
           <span class="fw-legend__name ox-truncate">${esc(catLabel(s.cat))}</span>
           <span class="fw-legend__amount ox-copyable">${fmtARS(s.total)}</span>
           <span class="fw-legend__pct">${((s.total / total) * 100).toFixed(0)}%</span>

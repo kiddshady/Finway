@@ -12,7 +12,7 @@
 import { Icons } from '../icons.js';
 import { exit } from '../motion.js';
 import { esc } from '../ui.js';
-import { catsFor } from './categories.js';
+import { catColor, catsFor } from './categories.js';
 import { parseAmount, todayStr, shiftMonth, daysInMonth } from './format.js';
 
 const DOW = ['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO'];
@@ -32,7 +32,9 @@ const S = {
 /* ══ Markup ══════════════════════════════════════════════════════════════════ */
 
 const catsHTML = () => catsFor(S.type).map((c) => `
-  <button class="fw-cat-btn${c.id === S.category ? ' is-on' : ''}" data-cat="${esc(c.id)}">${esc(c.label)}</button>`).join('');
+  <button class="fw-cat-btn${c.id === S.category ? ' is-on' : ''}" data-cat="${esc(c.id)}" style="--fw-cat:${catColor(c.id)}">
+    <span class="fw-dot"></span>${esc(c.label)}
+  </button>`).join('');
 
 export function quickAddHTML() {
   const isIncome = S.type === 'income';

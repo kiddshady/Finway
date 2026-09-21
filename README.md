@@ -42,7 +42,7 @@ renderer/css/         tokens, base, shell, controles, superficies, overlays ← 
 renderer/css/finway.css   el par verde/rojo y lo del dominio
 renderer/js/          icons, motion, overlays, router, ui, format          ← Onyx
 renderer/js/update.js el modal de "está lista" y el estado para Ajustes    ← nació acá, no está en Onyx
-renderer/js/fin/      format, categories, stats, charts, quickadd, views, ajustes, calculadora, state, mark
+renderer/js/fin/      format, categories, stats, charts, trend, quickadd, views, ajustes, calculadora, state, mark
 renderer/js/app.js    lo que une las dos mitades
 ```
 
@@ -68,9 +68,9 @@ se integra en vez de borrar.
 
 ## Color
 
-Finway es Onyx con un solo agregado de color: **verde entra, rojo sale**, y el
-balance toma el color de su signo. Todo lo demás —el shell, los chips, las
-categorías— es acromático, como la plantilla.
+Finway es Onyx con dos agregados de color: **verde entra, rojo sale** (solo en
+los gráficos de flujo), y **un color por categoría**. Todo lo demás —el shell,
+las cifras— es acromático, como la plantilla.
 
 **El rojo es `--ox-danger`.** Hubo una etapa con un rojo propio más saturado, para
 que la pérdida "pegara"; desde el 17 sep 2026 la app se quiere más fiel a Onyx y
@@ -82,11 +82,12 @@ verde no llega tan lejos como el rojo, así que se iguala la luminancia y el
 **porcentaje del techo de cada matiz** (~57%). Si el danger cambia, la cuenta se
 rehace; el humo mide que sigan pesando igual y que se lean a 11 px.
 
-Las **categorías no tienen color.** En el donut cada gajo toma el gris de su
-**puesto** en el mes (el más grande, el más claro) y la leyenda va en ese mismo
-orden. Ojo: una rampa con un gris *fijo por categoría* ya se probó y dejó el donut
-ilegible; lo que funciona es que el gris lo decida el ranking. El humo mide que la
-escalera baje de a escalones visibles y que nada tenga croma.
+Cada **categoría tiene su color** (de vuelta desde el 21 sep 2026, tras unos días
+en grises). Es un abanico en OKLCH elegido para maximizar la distancia perceptual
+mínima entre todos los pares, con croma ≤ .14 y lejos del verde y el rojo. Aparece
+donde identifica a la categoría: gajos del donut, líneas de la tendencia, y el
+puntito de chips y filas; nunca en una cifra. El humo mide la distancia mínima en
+Oklab entre categorías y contra el par verde/rojo.
 
 Toda la escalera sale de dos perillas en
 [renderer/css/tokens.css](renderer/css/tokens.css) (`--ox-hue` y `--ox-tint`),
@@ -102,6 +103,10 @@ las mismas matrices que Chromium y falla si divergieron.
 
 ## Uso
 
+- **Tendencia por categoría** (Resumen): gasto mensual de cada categoría en los
+  últimos 6 o 12 meses. Click en un chip prende o apaga su línea, doble click deja
+  solo esa, y el botón del final prende o apaga todas. Hover sobre el gráfico
+  muestra el detalle del mes.
 - **Carga rápida** (inspector de Movimientos): tipo → monto → categoría → Enter.
   La fecha default es hoy; si cargás en otro mes, salta a verlo. `Ctrl+N` lleva
   el cursor ahí.
