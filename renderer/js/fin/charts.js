@@ -218,9 +218,12 @@ export function wireLine(root, cur, prev, todayDay) {
   });
 }
 
-/* ══ Barras: flujo de los últimos meses ══════════════════════════════════════ */
+/* ══ Barras: flujo de los últimos meses ══════════════════════════════════════
+   Va en una card de ancho completo, igual que la tendencia, y por eso comparte
+   su lienzo: 960 de ancho. Con 560 el SVG se estiraba casi al doble para
+   llenar la card y los textos del eje salían a ~17px en vez de 9,5. */
 
-const BW = 560, BH = 230, BL = 56, BR = 16, BT = 18, BB = 30;
+const BW = 960, BH = 250, BL = 56, BR = 20, BT = 18, BB = 30;
 const BIW = BW - BL - BR, BIH = BH - BT - BB;
 
 export function barsHTML(flow, selected) {
