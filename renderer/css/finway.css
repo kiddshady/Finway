@@ -599,7 +599,58 @@
    Una planilla de dos columnas y un total. Los montos van en mono y alineados
    a la derecha, como en cualquier columna de números: así las cifras quedan
    una debajo de la otra y se comparan de un vistazo. */
-.fw-calc { max-width: 620px; }
+/* Hasta cuatro, en grilla: de a dos cuando la ventana da, una abajo de la otra
+   cuando no. Cada una conserva el ancho máximo que tenía cuando era la única. */
+.fw-calcs {
+  /* auto-fill cuenta columnas con el MÁXIMO del minmax: con 620 fijo arriba
+     no entraban dos nunca. El tope de ancho lo pone max-width. */
+  display: grid;
+  max-width: calc(620px * 2 + var(--ox-4));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+  align-items: start;
+  gap: var(--ox-4);
+}
+.fw-calc { min-width: 0; }
+.fw-calc__head {
+  display: flex;
+  align-items: center;
+  gap: var(--ox-2);
+  padding: var(--ox-3) var(--ox-3) 0 var(--ox-4);
+}
+/* El título es un campo que no parece campo hasta que lo tocás: en reposo se
+   lee como el nombre de la tarjeta, con hover o foco asoma su fondo. Vacío,
+   el placeholder la nombra por su lugar. */
+.fw-calc__titulo {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin-left: calc(var(--ox-2) * -1);
+  padding: 0 var(--ox-2);
+  border: 0;
+  border-radius: var(--ox-r-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--ox-fs-13);
+  font-weight: var(--ox-w-medium);
+  color: var(--ox-text);
+  outline: none;
+  user-select: text;
+  transition: background-color var(--ox-t-1) var(--ox-ease-soft), box-shadow var(--ox-t-1) var(--ox-ease-soft);
+}
+.fw-calc__titulo::placeholder { color: var(--ox-text-2); transition: color var(--ox-t-1) var(--ox-ease-soft); }
+.fw-calc__titulo:hover { background: var(--ox-s3); }
+/* Con foco, el mismo anillo que el resto de los campos (.ox-input:focus). */
+.fw-calc__titulo:focus,
+.fw-calc__titulo:focus-visible {
+  background: var(--ox-bg);
+  box-shadow: inset 0 0 0 1px var(--ox-line-3), 0 0 0 3px var(--ox-wash-1);
+}
+.fw-calc__titulo:focus::placeholder { color: var(--ox-text-4); }
+/* Con una sola no hay nada que cerrar: la X se apaga pero guarda su lugar,
+   así la cabecera no salta al abrir la segunda. */
+.fw-calc__cerrar { transition: opacity var(--ox-t-1) var(--ox-ease-soft), visibility 0s, background-color var(--ox-t-1) var(--ox-ease-soft), color var(--ox-t-1) var(--ox-ease-soft); }
+/* visibility (con demora, para que el fade termine) la saca también del Tab. */
+.fw-calcs.is-single .fw-calc__cerrar { opacity: 0; visibility: hidden; transition-delay: 0s, var(--ox-t-1), 0s, 0s; }
 .fw-calc__cols,
 .fw-calc__row {
   display: grid;

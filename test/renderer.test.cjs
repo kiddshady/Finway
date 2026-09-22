@@ -15,7 +15,7 @@
    datos reales.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -597,7 +597,7 @@ app.whenReady().then(async () => {
     el.focus(); el.value = ${JSON.stringify(valor)};
     el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   // fmtARS separa el $ con un espacio fino (U+2009): se normaliza para comparar.
-  const totalCalc = () => js(`document.getElementById('calc-total').textContent.replace(/\\s/g, ' ')`);
+  const totalCalc = (n = 0) => js(`document.querySelectorAll('.fw-calc__total')[${n}].textContent.replace(/\\s/g, ' ')`);
 
   await escribir(0, 'concepto', 'Alquiler');
   await escribir(0, 'monto', '250.000');
@@ -608,7 +608,7 @@ app.whenReady().then(async () => {
   await escribir(2, 'monto', 'quince mil');
   ok('un monto que no se entiende no suma', (await totalCalc()) === '$ 251.234,5', await totalCalc());
   ok('y queda marcado en la fila', await js(`document.querySelectorAll('.fw-calc__input.is-invalid').length === 1`));
-  ok('y el pie lo dice', /sin entender/.test(await js(`document.getElementById('calc-detalle').textContent`)));
+  ok('y el pie lo dice', /sin entender/.test(await js(`document.querySelector('.fw-calc__detalle').textContent`)));
   await escribir(2, 'monto', '15500');
 
   /* Enter en el último monto agrega una fila y deja el cursor ahí: es lo que
@@ -635,22 +635,87 @@ app.whenReady().then(async () => {
   await click('[data-view="resumen"]');
   await sleep(600);
   const calcEnDisco = JSON.parse(fs.readFileSync(path.join(tmp, 'calculadora.json'), 'utf8'));
-  ok('se guardó en calculadora.json al salir', calcEnDisco.filas?.length === 3, JSON.stringify(calcEnDisco).slice(0, 160));
-  ok('el monto se guarda como se escribió', calcEnDisco.filas?.[0]?.monto === '250.000', calcEnDisco.filas?.[0]?.monto);
+  const filasEnDisco = calcEnDisco.calculadoras?.[0]?.filas;
+  ok('se guardó en calculadora.json al salir', filasEnDisco?.length === 3, JSON.stringify(calcEnDisco).slice(0, 160));
+  ok('el monto se guarda como se escribió', filasEnDisco?.[0]?.monto === '250.000', filasEnDisco?.[0]?.monto);
   ok('y no tocó los movimientos',
     !(await js(`window.fw.load().then((l) => l.some((m) => /Alquiler/.test(m.note || '')))`)));
   await click('[data-view="calculadora"]');
   await sleep(700);
   ok('al volver están las mismas filas', (await totalCalc()) === '$ 265.500', await totalCalc());
   const n0 = await js(`document.querySelectorAll('.fw-calc__row').length`);
-  await click('#calc-agregar');
+  await click('.fw-calc__agregar');
   await sleep(300);
   ok('«Agregar fila» agrega una sola tras volver a la vista',
     (await js(`document.querySelectorAll('.fw-calc__row').length`)) === n0 + 1);
   const filaR = await rect('.fw-calc__row:last-child');
   ok('la fila nueva cae dentro de la ventana', dentro(filaR), JSON.stringify(filaR));
 
-  await click('#calc-vaciar');
+  /* Copiar deja la tabla en el portapapeles separada por tabs: solo lo
+     cargado, con encabezado y total. */
+  /* El portapapeles es el del sistema y sobrevive entre corridas: se vacía
+     antes y se espera a que llegue lo nuevo, que la escritura es asíncrona.
+     Windows guarda los saltos como \r\n. */
+  const copiarYLeer = async () => {
+    clipboard.writeText('');
+    await click('.fw-calc__copiar');
+    for (let i = 0; i < 20 && !clipboard.readText(); i++) await sleep(100);
+    return clipboard.readText().replace(/\r\n/g, '\n');
+  };
+  const copiado = await copiarYLeer();
+  ok('«Copiar» deja la tabla en el portapapeles',
+    copiado === 'Concepto\tMonto\nAlquiler\t250.000\n\t15500\nTotal\t$ 265.500', JSON.stringify(copiado));
+
+  /* El título es opcional: vacío, el placeholder la nombra por su lugar; con
+     texto, se guarda y encabeza la tabla copiada. */
+  ok('sin título, se llama por su lugar',
+    (await js(`document.querySelector('.fw-calc__titulo').placeholder`)) === 'Calculadora 1');
+  await js(`(() => { const el = document.querySelector('.fw-calc__titulo');
+    el.focus(); el.value = 'Mudanza'; el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  const copiadoConTitulo = await copiarYLeer();
+  ok('el título encabeza la tabla copiada',
+    copiadoConTitulo.startsWith('Mudanza\nConcepto\tMonto\n'), JSON.stringify(copiadoConTitulo));
+
+  /* Hasta cuatro calculadoras, cada una con su propia cuenta. */
+  ok('con una sola, la X de cerrar no está a mano',
+    await js(`getComputedStyle(document.querySelector('.fw-calc__cerrar')).visibility === 'hidden'`));
+  for (let i = 0; i < 3; i++) { await click('#calc-nueva'); await sleep(300); }
+  ok('se abren hasta cuatro calculadoras', (await js(`document.querySelectorAll('.fw-calc').length`)) === 4);
+  ok('y en la cuarta el botón se deshabilita', await js(`document.getElementById('calc-nueva').disabled`));
+  ok('las nuevas se nombran por su lugar, la titulada conserva el suyo',
+    (await js(`[...document.querySelectorAll('.fw-calc__titulo')].map((n) => n.value || n.placeholder).join('|')`))
+      === 'Mudanza|Calculadora 2|Calculadora 3|Calculadora 4');
+  await js(`(() => {
+    const el = document.querySelectorAll('.fw-calc')[1].querySelector('[data-campo="monto"]');
+    el.focus(); el.value = '1000'; el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  ok('la segunda suma aparte', (await totalCalc(1)) === '$ 1.000', await totalCalc(1));
+  ok('y la primera no se mueve', (await totalCalc(0)) === '$ 265.500', await totalCalc(0));
+
+  await click('.fw-calc:nth-child(4) .fw-calc__cerrar');
+  await sleep(500);
+  ok('cerrar una vacía no pregunta', (await js(`document.querySelectorAll('.fw-calc').length`)) === 3
+    && !(await js(`!!document.querySelector('.ox-modal')`)));
+  ok('y el botón vuelve a estar disponible', !(await js(`document.getElementById('calc-nueva').disabled`)));
+  await click('.fw-calc:nth-child(2) .fw-calc__cerrar');
+  await sleep(600);
+  ok('cerrar una con datos pide confirmación', dentro(await rect('.ox-modal')));
+  await click('.ox-modal .ox-btn--danger-solid');
+  await sleep(800);
+  ok('y se va, dejando las demás', (await js(`document.querySelectorAll('.fw-calc').length`)) === 2
+    && (await totalCalc(0)) === '$ 265.500', await totalCalc(0));
+  await click('.fw-calc:nth-child(2) .fw-calc__cerrar');
+  await sleep(600);
+  ok('queda una sola y sin X', (await js(`document.querySelectorAll('.fw-calc').length`)) === 1);
+
+  await click('[data-view="resumen"]');
+  await sleep(600);
+  const calcsEnDisco = JSON.parse(fs.readFileSync(path.join(tmp, 'calculadora.json'), 'utf8')).calculadoras;
+  ok('en disco queda una sola calculadora, con su título',
+    calcsEnDisco?.length === 1 && calcsEnDisco[0].titulo === 'Mudanza', JSON.stringify(calcsEnDisco).slice(0, 160));
+  await click('[data-view="calculadora"]');
+  await sleep(700);
+
+  await click('.fw-calc__vaciar');
   await sleep(600);
   ok('vaciar pide confirmación', dentro(await rect('.ox-modal')));
   await click('.ox-modal .ox-btn--danger-solid');

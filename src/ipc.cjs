@@ -12,7 +12,7 @@
    renderer escribe try/catch normal en vez de chequear banderas.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const { ipcMain, app, dialog, BrowserWindow } = require('electron');
+const { ipcMain, app, clipboard, dialog, BrowserWindow } = require('electron');
 const store = require('./store.cjs');
 const movimientos = require('./movimientos.cjs');
 const fsp = require('fs').promises;
@@ -53,6 +53,10 @@ function register() {
 
   handle('doc:read', (name, fallback = null) => store.doc(name, fallback).read());
   handle('doc:write', (name, data) => store.doc(name).write(data).then(() => true));
+
+  /* navigator.clipboard se niega a escribir si la ventana no tiene el foco;
+     el portapapeles del sistema, desde acá, no pide nada. */
+  handle('clipboard:write', (text) => { clipboard.writeText(String(text)); return true; });
 
   handle('col:list', (name) => coll(name).list());
   handle('col:get', (name, id) => coll(name).get(id));

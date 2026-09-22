@@ -60,6 +60,10 @@ contextBridge.exposeInMainWorld('onyx', {
     write: (name, data) => call('doc:write', name, data),
   },
 
+  clipboard: {
+    writeText: (text) => call('clipboard:write', text),
+  },
+
   /* ── Movimientos ───────────────────────────────────────────────────────────
      El dominio va en su propio namespace y no colgado de `onyx`: `window.onyx`
      es la API del FRAMEWORK y significa lo mismo en todas las apps: mezclarle
