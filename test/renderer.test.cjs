@@ -144,6 +144,19 @@ app.whenReady().then(async () => {
      del trazo, no la presencia del nodo. */
   const largo = await js(`(() => { const p = document.querySelector('.fw-line__cur'); return p ? p.getTotalLength() : 0; })()`);
   ok('la línea del mes tiene trazo real', largo > 10, String(largo));
+  /* El ingreso acumulado es el mismo gráfico con otra tinta: tiene que ser un
+     SVG aparte (ids propios, sin pisarle nada al drenaje) y teñirse de verde. */
+  const lineIn = await js(`(() => { const p = document.querySelector('#line-in-svg .fw-line__cur');
+    return { largo: p ? p.getTotalLength() : 0, stroke: p ? getComputedStyle(p).stroke : '',
+      verde: getComputedStyle(document.documentElement).getPropertyValue('--fw-in').trim(),
+      drenaje: !!document.querySelector('#line-svg .fw-line__cur') }; })()`);
+  ok('el ingreso acumulado tiene su propia línea con trazo', lineIn.largo > 10 && lineIn.drenaje, JSON.stringify(lineIn));
+  const pintaDe = async (sel, prop) => js(`(() => { const cv = document.createElement('canvas'); cv.width = cv.height = 1;
+    const cx = cv.getContext('2d'); cx.fillStyle = getComputedStyle(document.querySelector(${JSON.stringify(sel)}))[${JSON.stringify(prop)}];
+    cx.fillRect(0, 0, 1, 1); return [...cx.getImageData(0, 0, 1, 1).data].slice(0, 3).join(','); })()`);
+  ok('y va en verde, no en el rojo del drenaje',
+    (await pintaDe('#line-in-svg .fw-line__cur', 'stroke')) === (await pintaDe('.fw-bar--in', 'fill'))
+    && (await pintaDe('#line-in-svg .fw-line__cur', 'stroke')) !== (await pintaDe('#line-svg .fw-line__cur', 'stroke')));
   const barras = await js(`[...document.querySelectorAll('.fw-bar')].filter(b => Number(b.getAttribute('height')) > 0).length`);
   ok('las barras tienen altura', barras >= 2, String(barras));
   ok('el eje de las barras muestra 6 meses', (await js(`document.querySelectorAll('#bars-svg .fw-bar-month').length`)) === 6);

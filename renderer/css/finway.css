@@ -114,6 +114,9 @@
   padding-bottom: var(--ox-5);
 }
 .fw-charts > .fw-card--wide { grid-column: 1 / -1; }
+/* El donut ocupa dos filas: a su derecha se apilan los dos acumulados, que
+   comparten el eje de días y así se leen uno arriba del otro. */
+.fw-charts > .fw-card--tall { grid-row: span 2; }
 .fw-card__actions { margin-left: auto; }
 .fw-card__body { padding: var(--ox-3) var(--ox-4) var(--ox-4); }
 
@@ -222,10 +225,14 @@
 }
 .fw-dot { width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto }
 
-/* ── Línea de drenaje acumulado ─────────────────────────────────────────── */
+/* ── Líneas de acumulado: drenaje (gastos) e ingreso ────────────────────── */
+/* Un solo juego de reglas para los dos gráficos: el modificador elige la
+   tinta, y todo lo que es "la serie de este mes" la toma de acá. */
+.fw-line     { --fw-line-c: var(--fw-out) }
+.fw-line--in { --fw-line-c: var(--fw-in) }
 .fw-line__cur {
   fill: none;
-  stroke: var(--fw-out);
+  stroke: var(--fw-line-c);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -243,9 +250,9 @@
 }
 .fw-line__area { animation: ox-in-fade .8s var(--ox-ease) both }
 .fw-line__today { stroke: var(--ox-text-4); stroke-width: 1; stroke-dasharray: 2 4; opacity: .7 }
-.fw-line__tip { fill: var(--fw-out); animation: fw-tip-in .4s var(--ox-ease) .55s both }
+.fw-line__tip { fill: var(--fw-line-c); animation: fw-tip-in .4s var(--ox-ease) .55s both }
 @keyframes fw-tip-in { from { r: 0; opacity: 0 } to { r: 4; opacity: 1 } }
-.fw-line__hover      { fill: var(--fw-out); stroke: var(--ox-bg); stroke-width: 1.5 }
+.fw-line__hover      { fill: var(--fw-line-c); stroke: var(--ox-bg); stroke-width: 1.5 }
 .fw-line__hover--prev { fill: var(--ox-text-3) }
 
 /* ── Barras de flujo mensual ────────────────────────────────────────────── */

@@ -109,14 +109,19 @@ export function wireDonut(root, data, total) {
   });
 }
 
-/* ══ Línea: drenaje acumulado ════════════════════════════════════════════════
-   El mes en curso (rojo, con área) contra el anterior (punteado dim). La
-   pregunta que responde: ¿vengo gastando más rápido que el mes pasado? */
+/* ══ Línea: acumulado del mes ════════════════════════════════════════════════
+   El mes en curso (con área) contra el anterior (punteado dim). Dibuja dos
+   gráficos con el mismo código, y `kind` elige cuál:
+     · 'out' — drenaje acumulado, en rojo: ¿vengo gastando más rápido que el
+       mes pasado?
+     · 'in'  — ingreso acumulado, en verde: ¿me está entrando más, menos o lo
+       mismo que el mes pasado?
+   `id` prefija los ids del SVG para que los dos convivan en la misma vista. */
 
 const LW = 560, LH = 230, LL = 56, LR = 16, LT = 16, LB = 28;
 const LIW = LW - LL - LR, LIH = LH - LT - LB;
 
-export function lineHTML(cur, prev, todayDay) {
+export function lineHTML(cur, prev, todayDay, { id = 'line', kind = 'out' } = {}) {
   const curDrawn = todayDay ? cur.slice(0, todayDay) : cur;
   const maxDays = Math.max(cur.length, prev.length, 2);
   const maxVal = Math.max(curDrawn[curDrawn.length - 1] ?? 0, prev[prev.length - 1] ?? 0, 1);
@@ -141,12 +146,12 @@ export function lineHTML(cur, prev, todayDay) {
     `<text class="fw-tick" x="${x(d).toFixed(1)}" y="${LH - 8}" text-anchor="middle">${d}</text>`).join('');
 
   return `
-    <div class="fw-line" data-max-days="${maxDays}">
-      <svg viewBox="0 0 ${LW} ${LH}" class="fw-chart" id="line-svg">
+    <div class="fw-line fw-line--${kind}" data-max-days="${maxDays}">
+      <svg viewBox="0 0 ${LW} ${LH}" class="fw-chart" id="${id}-svg">
         <defs>
-          <linearGradient id="fw-area-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="var(--fw-out)" stop-opacity=".22"/>
-            <stop offset="100%" stop-color="var(--fw-out)" stop-opacity="0"/>
+          <linearGradient id="${id}-area-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="var(--fw-${kind})" stop-opacity=".22"/>
+            <stop offset="100%" stop-color="var(--fw-${kind})" stop-opacity="0"/>
           </linearGradient>
         </defs>
         ${grid}
@@ -155,29 +160,29 @@ export function lineHTML(cur, prev, todayDay) {
         ${todayDay && todayDay <= maxDays
           ? `<line class="fw-line__today" x1="${x(todayDay).toFixed(1)}" y1="${LT}" x2="${x(todayDay).toFixed(1)}" y2="${y(0).toFixed(1)}"/>`
           : ''}
-        ${area ? `<path class="fw-line__area" d="${area}" fill="url(#fw-area-grad)"/>` : ''}
+        ${area ? `<path class="fw-line__area" d="${area}" fill="url(#${id}-area-grad)"/>` : ''}
         ${curPath ? `<path class="fw-line__cur" d="${curPath}" pathLength="1"/>` : ''}
         ${curDrawn.length
           ? `<circle class="fw-line__tip" cx="${x(curDrawn.length).toFixed(1)}" cy="${y(curDrawn[curDrawn.length - 1]).toFixed(1)}" r="4"/>`
           : ''}
-        <g id="line-hover" style="opacity:0;transition:opacity var(--ox-t-1) var(--ox-ease-soft)">
-          <line class="fw-hairline" id="line-hair" x1="0" y1="${LT}" x2="0" y2="${y(0).toFixed(1)}"/>
-          <circle class="fw-line__hover" id="line-dot" r="4.5" cx="0" cy="0"/>
-          <circle class="fw-line__hover fw-line__hover--prev" id="line-dot-prev" r="3" cx="0" cy="0"/>
+        <g id="${id}-hover" style="opacity:0;transition:opacity var(--ox-t-1) var(--ox-ease-soft)">
+          <line class="fw-hairline" id="${id}-hair" x1="0" y1="${LT}" x2="0" y2="${y(0).toFixed(1)}"/>
+          <circle class="fw-line__hover" id="${id}-dot" r="4.5" cx="0" cy="0"/>
+          <circle class="fw-line__hover fw-line__hover--prev" id="${id}-dot-prev" r="3" cx="0" cy="0"/>
         </g>
         ${xLabels}
       </svg>
-      <div class="fw-readout" id="line-readout">
-        <span class="fw-key fw-key--out"><i class="fw-key__line"></i> este mes</span>
+      <div class="fw-readout" id="${id}-readout">
+        <span class="fw-key fw-key--${kind}"><i class="fw-key__line"></i> este mes</span>
         <span class="fw-key fw-key--prev"><i class="fw-key__line"></i> mes anterior</span>
       </div>
     </div>`;
 }
 
-export function wireLine(root, cur, prev, todayDay) {
-  const svg = root.querySelector('#line-svg');
-  const readout = root.querySelector('#line-readout');
-  const hover = root.querySelector('#line-hover');
+export function wireLine(root, cur, prev, todayDay, { id = 'line', kind = 'out' } = {}) {
+  const svg = root.querySelector(`#${id}-svg`);
+  const readout = root.querySelector(`#${id}-readout`);
+  const hover = root.querySelector(`#${id}-hover`);
   if (!svg || !readout || !hover) return;
 
   const curDrawn = todayDay ? cur.slice(0, todayDay) : cur;
@@ -186,9 +191,9 @@ export function wireLine(root, cur, prev, todayDay) {
   const x = (day) => LL + ((day - 1) / (maxDays - 1)) * LIW;
   const y = (v) => LT + LIH - (v / maxVal) * LIH;
 
-  const hair = root.querySelector('#line-hair');
-  const dot = root.querySelector('#line-dot');
-  const dotPrev = root.querySelector('#line-dot-prev');
+  const hair = root.querySelector(`#${id}-hair`);
+  const dot = root.querySelector(`#${id}-dot`);
+  const dotPrev = root.querySelector(`#${id}-dot-prev`);
   const idle = readout.innerHTML;
 
   svg.addEventListener('mousemove', (e) => {
@@ -208,7 +213,7 @@ export function wireLine(root, cur, prev, todayDay) {
 
     readout.innerHTML = `
       <span class="fw-readout__label">DÍA ${String(day).padStart(2, '0')}</span>
-      ${vCur != null ? `<span class="fw-readout__out">${fmtARS(vCur)}</span>` : ''}
+      ${vCur != null ? `<span class="fw-readout__${kind}">${fmtARS(vCur)}</span>` : ''}
       ${vPrev != null ? `<span class="ox-dim">mes ant. ${fmtARS(vPrev)}</span>` : ''}`;
   });
 

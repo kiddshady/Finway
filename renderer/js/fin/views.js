@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    FINWAY — las dos vistas
-   Resumen: los números del mes y sus tres gráficos.
+   Resumen: los números del mes y sus gráficos.
    Movimientos: la lista del mes, con la carga rápida en el inspector.
 
    El mes es el marco de TODO: las dos vistas hablan siempre del mes que dice
@@ -63,6 +63,9 @@ export function viewResumen() {
   const flow = monthlyFlow(S.moves, S.month, 6);
   const cur = cumulativeFlow(S.moves, S.month);
   const prev = cumulativeFlow(S.moves, shiftMonth(S.month, -1));
+  const curIn = cumulativeFlow(S.moves, S.month, 'income');
+  const prevIn = cumulativeFlow(S.moves, shiftMonth(S.month, -1), 'income');
+  const lineIn = { id: 'line-in', kind: 'in' };
   const isCurrent = S.month === currentMonth();
   const todayDay = isCurrent ? Number(todayStr().slice(8, 10)) : null;
   const trend = categoryTrend(S.moves, S.month, S.trendRange);
@@ -80,8 +83,8 @@ export function viewResumen() {
      "Drenaje acumulado" llevaba el punto del balance y lo que dibuja son
      gastos, y "Flujo" el del ingreso mostrando las dos cosas. El título dice
      de qué es la card; el color vive adentro, donde es un dato. */
-  const card = (title, body, wide = false, { id = '', actions = '' } = {}) => `
-    <section class="ox-card${wide ? ' fw-card--wide' : ''}"${id ? ` id="${id}"` : ''}>
+  const card = (title, body, wide = false, { id = '', actions = '', tall = false } = {}) => `
+    <section class="ox-card${wide ? ' fw-card--wide' : ''}${tall ? ' fw-card--tall' : ''}"${id ? ` id="${id}"` : ''}>
       <div class="ox-card__head"><span class="ox-label">${title}</span>${actions}</div>
       <div class="ox-card__body fw-card__body">${body}</div>
     </section>`;
@@ -101,8 +104,9 @@ export function viewResumen() {
              t.projection > 0 ? `proyección a fin de mes ${fmtARS(t.projection)}` : '')}
          </div>
          <div class="fw-charts">
-           ${card('Gastos por categoría', donutHTML(cats, t.expense))}
+           ${card('Gastos por categoría', donutHTML(cats, t.expense), false, { tall: true })}
            ${card('Drenaje acumulado', lineHTML(cur, prev, todayDay))}
+           ${card('Ingreso acumulado', lineHTML(curIn, prevIn, todayDay, lineIn))}
            ${card('Flujo · últimos 6 meses', barsHTML(flow, S.month), true)}
            ${card('Tendencia por categoría', trendHTML(trend, trendSel(trend)), true, {
              id: 'trend-card',
@@ -119,11 +123,12 @@ export function viewResumen() {
   wireMonthNav(root, () => Router.refresh());
   wireDonut(root, cats, t.expense);
   wireLine(root, cur, prev, todayDay);
+  wireLine(root, curIn, prevIn, todayDay, lineIn);
   wireBars(root, flow, (ym) => { S.month = ym; chromeChanged(); Router.refresh(); });
   wireTrend(root, trend, trendSel(trend), trendPick);
 
   // El rango repinta SOLO la tendencia: remontar la vista entera reiniciaría
-  // las animaciones de entrada de los otros tres gráficos.
+  // las animaciones de entrada de los otros gráficos.
   bindSwitcher(root.querySelector('#trend-range'), (value) => {
     S.trendRange = Number(value);
     const body = root.querySelector('#trend-card .ox-card__body');

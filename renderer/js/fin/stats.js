@@ -40,12 +40,13 @@ export function monthlyFlow(moves, ym, n = 6) {
   return out;
 }
 
-/** Gasto acumulado día a día del mes: array[daysInMonth] con el acumulado. */
-export function cumulativeFlow(moves, ym) {
+/** Acumulado día a día del mes, de gastos o de ingresos según `type`:
+    array[daysInMonth] con el acumulado. */
+export function cumulativeFlow(moves, ym, type = 'expense') {
   const days = daysInMonth(ym);
   const perDay = new Array(days).fill(0);
   for (const m of movesOf(moves, ym)) {
-    if (m.type !== 'expense') continue;
+    if (m.type !== type) continue;
     perDay[Number(m.date.slice(8, 10)) - 1] += m.amount;
   }
   let acc = 0;
