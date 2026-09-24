@@ -111,6 +111,9 @@
 .ox-menuitem--danger .ox-icon,
 .ox-menuitem--danger:hover .ox-icon,
 .ox-menuitem--danger.is-active .ox-icon { color: var(--ox-danger); }
+.ox-menuitem__dot { width: 8px; height: 8px; margin: 0 3px; border-radius: 2px; flex: 0 0 auto; }
+/* Apagado sin hover: no se puede elegir, así que tampoco se resalta. */
+.ox-menuitem:disabled { opacity: .38; pointer-events: none; }
 .ox-menuitem__key { margin-left: auto; font-size: var(--ox-fs-10); color: var(--ox-text-4); }
 .ox-menu__sep { height: 1px; margin: var(--ox-1) var(--ox-2); background: var(--ox-line); }
 .ox-menu__label {

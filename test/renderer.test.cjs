@@ -539,6 +539,35 @@ app.whenReady().then(async () => {
   await click('#mv-filter [data-value="all"]');
   await sleep(400);
 
+  // Filtro de categoría: el select abre un menú con las dos listas, cada
+  // categoría con su puntito y su cuenta del mes; las vacías, apagadas.
+  await click('#mv-cat');
+  await sleep(350);
+  const menuCat = await js(`(() => { const its = [...document.querySelectorAll('.ox-menu .ox-menuitem')];
+    const it = (t) => its.find((b) => b.querySelector('.ox-truncate').textContent === t);
+    return { n: its.length, dots: document.querySelectorAll('.ox-menu .ox-menuitem__dot').length,
+      rotulos: [...document.querySelectorAll('.ox-menu .ox-menu__label')].map((l) => l.textContent),
+      comida: it('Comida')?.querySelector('.ox-menuitem__key')?.textContent,
+      ropaApagada: !!it('Ropa')?.disabled }; })()`);
+  ok('el menú de categorías trae las dos listas con su puntito', menuCat.dots === 16 && menuCat.n === 17
+    && menuCat.rotulos.join() === 'Gastos,Ingresos', JSON.stringify(menuCat));
+  ok('cuenta los movimientos del mes y apaga las vacías', menuCat.comida === '1' && menuCat.ropaApagada, JSON.stringify(menuCat));
+  await js(`[...document.querySelectorAll('.ox-menu .ox-menuitem')].find((b) => b.textContent.trim().startsWith('Comida')).click()`);
+  await sleep(500);
+  const soloComida = await js(`[...document.querySelectorAll('#mv-rows .ox-tr .fw-cat')].map((c) => c.textContent.trim())`);
+  ok('elegir Comida deja solo filas de Comida', soloComida.length === 1 && soloComida[0] === 'Comida', JSON.stringify(soloComida));
+  ok('el select dice la categoría y el encabezado suma el total',
+    (await js(`document.querySelector('#mv-cat .ox-select__value').textContent`)) === 'Comida'
+    && /1 movimiento · \$/.test(await js(`document.querySelector('.ox-viewhead__sub').textContent`)),
+    await js(`document.querySelector('.ox-viewhead__sub').textContent`));
+  await click('#mv-filter [data-value="income"]');
+  await sleep(500);
+  ok('pasar a Ingresos suelta una categoría de gastos',
+    (await js(`document.querySelector('#mv-cat .ox-select__value').textContent`)) === 'Todas las categorías'
+    && (await js(`document.querySelectorAll('#mv-rows .ox-tr').length`)) === 1);
+  await click('#mv-filter [data-value="all"]');
+  await sleep(400);
+
   const mesAntes = await js(`document.querySelector('.ox-viewhead__title').textContent.trim()`);
   await click('[data-month="-1"]');
   await sleep(700);

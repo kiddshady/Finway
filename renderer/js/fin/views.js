@@ -12,7 +12,7 @@ import { Menu, Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
 import { bindSwitcher, stagger } from '../motion.js';
 import { esc, head, paint, viewEl } from '../ui.js';
-import { catColor, catLabel } from './categories.js';
+import { catColor, catLabel, catsFor } from './categories.js';
 import { barsHTML, donutHTML, lineHTML, wireBars, wireDonut, wireLine } from './charts.js';
 import { currentMonth, dayLabel, fmtARS, monthTitle, shiftMonth, todayStr } from './format.js';
 import { markSVG } from './mark.js';
@@ -155,9 +155,60 @@ const trendPick = (sel) => { trendPicked = sel; };
 const FILTERS = [['all', 'Todo'], ['expense', 'Gastos'], ['income', 'Ingresos']];
 
 const filtered = () => {
-  const ms = movesOf(S.moves, S.month);
-  return S.filter === 'all' ? ms : ms.filter((m) => m.type === S.filter);
+  let ms = movesOf(S.moves, S.month);
+  if (S.filter !== 'all') ms = ms.filter((m) => m.type === S.filter);
+  if (S.cat) ms = ms.filter((m) => m.category === S.cat);
+  return ms;
 };
+
+/* Con una categoría elegida, el encabezado suma también cuánto da: es lo
+   primero que uno quiere saber al filtrar ("¿cuánto se me fue en comida?").
+   Sin categoría no, porque ahí se mezclan ingresos con gastos. */
+const subOf = (list) => {
+  const n = `${list.length} ${list.length === 1 ? 'movimiento' : 'movimientos'}`;
+  return S.cat && list.length ? `${n} · ${fmtARS(list.reduce((a, m) => a + m.amount, 0))}` : n;
+};
+
+/* ══ Filtro de categoría ═════════════════════════════════════════════════════
+   Un select propio al lado del de tipo. El menú lista las categorías del tipo
+   elegido (con «Todo», las dos listas con su rótulo), cada una con su color y
+   cuántos movimientos tiene en el mes. Las que no tienen ninguno aparecen
+   apagadas: se ve que existen, pero no llevan a una tabla vacía. */
+
+const catFilterHTML = () => `
+  <button class="ox-select fw-catfilter${S.cat ? ' is-set' : ''}" id="mv-cat">
+    <span class="fw-dot fw-catfilter__dot" style="background:${S.cat ? catColor(S.cat) : 'transparent'}"></span>
+    <span class="ox-select__value">${S.cat ? esc(catLabel(S.cat)) : 'Todas las categorías'}</span>
+    <i data-icon="chevronDown"></i>
+  </button>`;
+
+function paintCatFilter(root) {
+  const btn = root.querySelector('#mv-cat');
+  if (!btn) return;
+  btn.classList.toggle('is-set', !!S.cat);
+  // El puntito conserva el color al apagarse: así se desvanece, no se vacía.
+  if (S.cat) btn.querySelector('.fw-catfilter__dot').style.background = catColor(S.cat);
+  btn.querySelector('.ox-select__value').textContent = S.cat ? catLabel(S.cat) : 'Todas las categorías';
+}
+
+function catMenu(anchor) {
+  const ms = movesOf(S.moves, S.month);
+  const delTipo = S.filter === 'all' ? ms : ms.filter((m) => m.type === S.filter);
+  const pick = (id) => { S.cat = id; paintCatFilter(viewEl()); repaintRows(); };
+  const item = (c) => {
+    const n = ms.filter((m) => m.category === c.id).length;
+    return { label: c.label, dot: c.color, key: String(n), selected: S.cat === c.id,
+      disabled: !n && S.cat !== c.id, onSelect: () => pick(c.id) };
+  };
+  const grupos = S.filter === 'all' ? [['Gastos', 'expense'], ['Ingresos', 'income']] : [[null, S.filter]];
+  const items = [{ label: 'Todas las categorías', key: String(delTipo.length), selected: !S.cat, onSelect: () => pick(null) }];
+  for (const [rotulo, tipo] of grupos) {
+    items.push({ sep: true });
+    if (rotulo) items.push({ groupLabel: rotulo });
+    items.push(...catsFor(tipo).map(item));
+  }
+  Menu.show(anchor, items);
+}
 
 function rowsHTML(list) {
   if (!list.length) {
@@ -165,9 +216,11 @@ function rowsHTML(list) {
       <div class="ox-empty">
         <span class="fw-empty-mark">${markSVG({ size: 40, cls: 'fw-mark--dim' })}</span>
         <div class="ox-empty__title">Sin movimientos este mes</div>
-        <div class="ox-empty__text">${S.filter === 'all'
-          ? 'Todavía no se drenó nada. Cargá el primero con el formulario de la derecha.'
-          : 'No hay movimientos de este tipo. Probá con otro filtro.'}</div>
+        <div class="ox-empty__text">${S.cat
+          ? 'No hay movimientos de esta categoría. Probá con otra o volvé a todas.'
+          : S.filter === 'all'
+            ? 'Todavía no se drenó nada. Cargá el primero con el formulario de la derecha.'
+            : 'No hay movimientos de este tipo. Probá con otro filtro.'}</div>
       </div></td></tr>`;
   }
 
@@ -198,13 +251,14 @@ export function viewMovimientos() {
       ${FILTERS.map(([id, label]) =>
         `<button class="ox-segmented__opt${S.filter === id ? ' is-active' : ''}" data-value="${id}">${label}</button>`).join('')}
     </div>
+    ${catFilterHTML()}
     <button class="ox-iconbtn" id="mv-export" data-tip="Exportar"${S.moves.length ? '' : ' disabled'}>
       <i data-icon="download"></i>
     </button>
     ${monthNavHTML()}`;
 
   paint(
-    head({ title: monthTitle(S.month), sub: `${list.length} ${list.length === 1 ? 'movimiento' : 'movimientos'}`, actions })
+    head({ title: monthTitle(S.month), sub: subOf(list), actions })
     + `<div class="ox-viewbody">
          <div class="ox-viewbody__main">
            <div class="ox-scroll ox-grow">
@@ -229,8 +283,16 @@ export function viewMovimientos() {
   wireMonthNav(root, () => Router.refresh());
   bindSwitcher(root.querySelector('#mv-filter'), (value) => {
     S.filter = value;
+    // Pasar a Ingresos con Comida elegida dejaría la tabla vacía sin motivo:
+    // una categoría del otro tipo se suelta sola.
+    if (S.cat && value !== 'all' && !catsFor(value).some((c) => c.id === S.cat)) {
+      S.cat = null;
+      paintCatFilter(root);
+    }
     repaintRows();
   });
+  const btnCat = root.querySelector('#mv-cat');
+  btnCat.addEventListener('click', () => catMenu(btnCat));
   const btnExport = root.querySelector('#mv-export');
   btnExport.addEventListener('click', () => exportMenu(btnExport));
   wireRows(root);
@@ -251,7 +313,7 @@ function repaintRows() {
   stagger(body);
 
   const sub = root.querySelector('.ox-viewhead__sub');
-  if (sub) sub.textContent = `${list.length} ${list.length === 1 ? 'movimiento' : 'movimientos'}`;
+  if (sub) sub.textContent = subOf(list);
   root.querySelector('#mv-export').disabled = !S.moves.length;
 }
 
@@ -383,7 +445,7 @@ function exportMenu(anchor) {
 async function exportMonth() {
   const list = filtered();
   if (!list.length) return;
-  const saved = await exportCsv(list, `finwatch-${S.month}.csv`);
+  const saved = await exportCsv(list, `finwatch-${S.month}${S.cat ? `-${S.cat}` : ''}.csv`);
   if (saved) Toast.show({ title: 'Exportado', text: saved.split('\\').pop(), icon: 'download' });
 }
 

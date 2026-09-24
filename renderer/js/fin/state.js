@@ -16,6 +16,7 @@ export const S = {
   moves: [],
   month: currentMonth(),
   filter: 'all',        // all | expense | income
+  cat: null,            // filtro de categoría de Movimientos: null = todas
   trendRange: 6,        // meses de la tendencia por categoría: 6 | 12
   info: null,
   lastSaved: null,

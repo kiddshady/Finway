@@ -87,6 +87,28 @@
 }
 .fw-monthnav__label .fw-year { color: var(--ox-text-3); font-weight: var(--ox-w-regular); }
 
+/* ── Filtro de categoría (Movimientos) ──────────────────────────────────────
+   El select de Onyx, angosto para el encabezado y a la altura del segmentado
+   de al lado. Con una categoría elegida le crece adelante el puntito de su
+   color; sin categoría el puntito se achica a cero y se esfuma, y el margen
+   negativo se come el gap para que el texto no quede corrido. */
+.fw-catfilter {
+  width: auto;
+  min-width: 172px;
+  height: 28px;
+  font-size: var(--ox-fs-12);
+  color: var(--ox-text-2);
+}
+.fw-catfilter.is-set { color: var(--ox-text); }
+.fw-catfilter__dot {
+  width: 0;
+  margin-right: calc(-1 * var(--ox-2));
+  opacity: 0;
+  transition: width var(--ox-t-2) var(--ox-ease), margin var(--ox-t-2) var(--ox-ease),
+              opacity var(--ox-t-2) var(--ox-ease-soft);
+}
+.fw-catfilter.is-set .fw-catfilter__dot { width: 8px; margin-right: 0; opacity: 1; }
+
 /* ── KPIs ───────────────────────────────────────────────────────────────────
    Las cifras sueltas de Onyx (.ox-stat), sin tarjeta ni canto de color: igual
    que la fila de números del Inicio de la plantilla. Las tres van en el texto

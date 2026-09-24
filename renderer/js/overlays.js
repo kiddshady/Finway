@@ -167,7 +167,9 @@ const Toast = (() => {
 })();
 
 /* ══ Menú ════════════════════════════════════════════════════════════════════
-   items: { label, icon, key, danger, selected, onSelect } | { sep:true } | { groupLabel } */
+   items: { label, icon, dot, key, danger, selected, onSelect } | { sep:true } | { groupLabel }
+   `dot` es un color: en vez de un ícono, un puntito de ese color (una
+   categoría, una etiqueta). Ocupa el mismo ancho, así las filas no bailan. */
 
 const Menu = (() => {
   let open = null;
@@ -234,7 +236,8 @@ const Menu = (() => {
       b.setAttribute('role', 'menuitem');
       if (it.disabled) b.disabled = true;
       b.innerHTML = `
-        ${it.icon ? Icons.svg(it.icon) : '<span style="width:14px"></span>'}
+        ${it.dot ? `<span class="ox-menuitem__dot" style="background:${it.dot}"></span>`
+          : it.icon ? Icons.svg(it.icon) : '<span style="width:14px"></span>'}
         <span class="ox-truncate"></span>
         ${it.key ? `<span class="ox-menuitem__key">${it.key}</span>` : ''}
         ${it.selected ? Icons.svg('check', 'ox-icon--sm') : ''}`;
