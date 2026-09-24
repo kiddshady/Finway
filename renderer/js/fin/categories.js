@@ -42,8 +42,12 @@
 
 const ABANICO = [
   ['comida', 'Comida', 'oklch(77% .14 6)'],
-  ['super', 'Súper', 'oklch(80% .14 84)'],
-  ['transporte', 'Transporte', 'oklch(62% .12 102)'],
+  // Naranja, no mostaza (24 sep 2026): el oliva de antes (62% .12 102) no le gustaba a Fran.
+  ['transporte', 'Transporte', 'oklch(75% .14 58)'],
+  // Devoluciones es la otra punta de Préstamos (ingresos): la plata que entró
+  // prestada y la que sale para devolverla. Mismo color a propósito —nunca
+  // comparten gráfico— para que se lean como el mismo hilo.
+  ['devoluciones', 'Devoluciones', 'oklch(85% .13 104)'],
   ['salidas', 'Salidas', 'oklch(80% .14 186)'],
   ['servicios', 'Servicios', 'oklch(62% .10 204)'],
   ['hogar', 'Hogar', 'oklch(80% .12 234)'],
@@ -59,13 +63,15 @@ const cat = ([id, label, color]) => ({ id, label, color });
 
 export const EXPENSE_CATS = ABANICO.map(cat);
 
-/* Los ingresos reusan cuatro tonos del mismo abanico, bien separados entre sí.
+/* Los ingresos reusan tonos del mismo abanico, bien separados entre sí.
    Nunca comparten gráfico con los gastos —el donut y la tendencia son solo de
    gastos— así que repetirlos no confunde, y una segunda paleta sería pedirle
-   a quien mira que aprenda quince colores. */
+   a quien mira que aprenda quince colores. Sueldo pasó del dorado de Súper al
+   naranja de Transporte: el dorado quedaba a 0.07 del amarillo de Préstamos. */
 export const INCOME_CATS = [
-  ['sueldo', 'Sueldo', 'oklch(80% .14 84)'],
+  ['sueldo', 'Sueldo', 'oklch(75% .14 58)'],
   ['freelance', 'Freelance', 'oklch(80% .14 186)'],
+  ['prestamos', 'Préstamos', 'oklch(85% .13 104)'],
   ['regalo', 'Regalo', 'oklch(71% .14 294)'],
   ['otros-in', 'Otros', 'oklch(62% 0 0)'],
 ].map(cat);

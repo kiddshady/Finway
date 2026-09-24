@@ -327,7 +327,7 @@ app.whenReady().then(async () => {
   ok('el inspector de carga está montado', dentro(await rect('#qa')));
   await js(`(() => { const i = document.getElementById('qa-amount');
     i.value = '4321,50'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-  await click('[data-cat="super"]');
+  await click('[data-cat="devoluciones"]');
   await js(`(() => { const n = document.getElementById('qa-note');
     n.value = 'cargado por el humo'; n.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
   await click('#qa-submit');
@@ -336,7 +336,7 @@ app.whenReady().then(async () => {
   const guardado = await js(`window.fw.load().then(l => l.find(m => m.note === 'cargado por el humo') || null)`);
   ok('quedó en disco', !!guardado, JSON.stringify(guardado));
   ok('la coma decimal se guardó como 4321.5', guardado?.amount === 4321.5, String(guardado?.amount));
-  ok('con la categoría elegida', guardado?.category === 'super', String(guardado?.category));
+  ok('con la categoría elegida', guardado?.category === 'devoluciones', String(guardado?.category));
   ok('el toast avisa', dentro(await rect('.ox-toast')));
   ok('el campo de monto se vació para el siguiente', (await js(`document.getElementById('qa-amount').value`)) === '');
   ok('y se quedó con el foco', await js(`document.activeElement?.id === 'qa-amount'`),
