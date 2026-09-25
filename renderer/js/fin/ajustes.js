@@ -19,7 +19,7 @@ export function viewAjustes() {
   const total = S.moves.reduce((acc, m) => acc + (m.type === 'income' ? m.amount : -m.amount), 0);
 
   paint(
-    head({ title: 'Ajustes', sub: 'Los datos de la app: de dónde vienen y a dónde van' })
+    head({ title: 'Ajustes', sub: 'Los datos de la app: de dónde vienen y a dónde van', linea: true })
     + `<div class="ox-scroll ox-grow">
 
         <section class="ox-section">

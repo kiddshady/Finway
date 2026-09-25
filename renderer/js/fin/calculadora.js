@@ -194,6 +194,7 @@ export function viewCalculadora() {
       sub: 'Filas sumadas a mano. No se mezclan con los movimientos',
       actions: `<button class="ox-btn ox-btn--ghost ox-btn--sm ox-flashable" id="calc-nueva">
                   <i data-icon="plus"></i> Nueva calculadora</button>`,
+      linea: true,
     })
     + `<div class="ox-scroll ox-grow">
         <div class="fw-calcs" id="calc-grilla">${calcs.map(calcHTML).join('')}</div>
