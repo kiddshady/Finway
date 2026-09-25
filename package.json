@@ -1,7 +1,7 @@
 {
   "name": "finway",
   "productName": "Finway",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Finway — registro de gastos e ingresos con análisis de balances.",
   "main": "main.cjs",
   "author": "Kidd Shady · Umbrovex Systems",
