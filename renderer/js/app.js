@@ -18,6 +18,8 @@ import { loadAll, refresh, S, setOnChrome, setOnSaved } from './fin/state.js';
 import { focusCarga, viewMovimientos, viewResumen } from './fin/views.js';
 import { viewAjustes } from './fin/ajustes.js';
 import { cargarCalculadora, viewCalculadora } from './fin/calculadora.js';
+import { cargarPresupuestos, viewPresupuestos } from './fin/presupuestos.js';
+import { cargarMetas, viewMetas } from './fin/metas.js';
 import { initUpdates } from './update.js';
 
 /* El shell es del framework: `window.onyx` significa lo mismo en todas las
@@ -36,6 +38,8 @@ Icons.add({
        + '<path d="M12.4 5.4 10.8 9.4H14z"/><path d="M5.8 13.6h4.4"/>',
   calc: '<rect x="3.2" y="1.8" width="9.6" height="12.4" rx="1.8"/><path d="M5.6 4.8h4.8"/>'
       + '<path d="M5.6 8.2h.4M7.8 8.2h.4M10 8.2h.4M5.6 11.2h.4M7.8 11.2h.4M10 11.2h.4"/>',
+  // Un medidor: el arco es el tope, la aguja lo que va del mes.
+  gauge: '<path d="M2 11a6 6 0 0 1 12 0"/><path d="M8 11l2.8-4.2"/><path d="M4.4 13.2h7.2"/>',
 });
 
 /* ══ Router ══════════════════════════════════════════════════════════════════ */
@@ -43,6 +47,8 @@ Icons.add({
 Router.define({
   resumen: { view: viewResumen },
   movimientos: { view: viewMovimientos },
+  presupuestos: { view: viewPresupuestos },
+  metas: { view: viewMetas },
   calculadora: { view: viewCalculadora },
   ajustes: { view: viewAjustes },
 }, document.getElementById('view'));
@@ -143,7 +149,7 @@ async function boot() {
   initUpdates();
 
   try {
-    await Promise.all([loadAll(), cargarCalculadora()]);
+    await Promise.all([loadAll(), cargarCalculadora(), cargarPresupuestos(), cargarMetas()]);
   } catch (err) {
     // Si los datos no cargan, la app tiene que DECIRLO. Una pantalla vacía sin
     // explicación es peor que un error feo.

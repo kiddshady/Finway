@@ -23,9 +23,10 @@ import { chromeChanged, exportAll, exportCsv, removeMove, S, saveMove } from './
 
 /* ══ Navegación de mes ═══════════════════════════════════════════════════════
    Va en las acciones del encabezado, así el título dice qué mes es y los
-   controles quedan del lado donde se buscan. */
+   controles quedan del lado donde se buscan. La usan también Presupuestos,
+   que habla del mismo mes. */
 
-const monthNavHTML = () => `
+export const monthNavHTML = () => `
   <div class="fw-monthnav">
     <button class="ox-iconbtn ox-iconbtn--sm" data-month="-1" data-tip="Mes anterior"><i data-icon="chevronLeft"></i></button>
     <button class="ox-iconbtn ox-iconbtn--sm" data-month="1" data-tip="Mes siguiente"><i data-icon="chevronRight"></i></button>
@@ -45,7 +46,7 @@ function onView(root, tipo, fn) {
   Router.onLeave(() => root.removeEventListener(tipo, fn));
 }
 
-function wireMonthNav(root, onChange) {
+export function wireMonthNav(root, onChange) {
   onView(root, 'click', (e) => {
     const btn = e.target.closest('[data-month]');
     if (!btn) return;
@@ -94,6 +95,7 @@ export function viewResumen() {
       title: monthTitle(S.month),
       sub: `${t.count} ${t.count === 1 ? 'movimiento' : 'movimientos'} en el mes`,
       actions: monthNavHTML(),
+      linea: true,
     })
     + `<div class="ox-scroll ox-grow">
          <div class="fw-kpis">

@@ -800,6 +800,90 @@ app.whenReady().then(async () => {
   await click('[data-view="movimientos"]');
   await sleep(700);
 
+  console.log('\n9-quinquies. Presupuestos');
+  const leerDoc = (n) => { try { return JSON.parse(fs.readFileSync(path.join(tmp, `${n}.json`), 'utf8')); } catch { return null; } };
+  const tipear = (sel, valor) => js(`(() => { const i = document.querySelector(${JSON.stringify(sel)});
+    if (!i) return false; i.focus(); i.value = ${JSON.stringify(valor)};
+    i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+  await click('[data-view="presupuestos"]');
+  await sleep(800);
+  ok('monta una fila por categoría de gasto', (await js(`document.querySelectorAll('.fw-budget__row').length`)) === 11);
+  ok('sin topes, explica qué hacer', await js(`!!document.querySelector('.fw-budget__intro')`));
+  ok('el encabezado lleva su línea', await js(`!!document.querySelector('.ox-viewhead--line')`));
+  await tipear('[data-tope="comida"]', '10.000');
+  await sleep(700);
+  ok('un tope por debajo de lo gastado marca la fila como pasada',
+    await js(`document.querySelector('.fw-budget__row[data-cat="comida"]').classList.contains('is-over')`));
+  ok('y la barra se pone roja', await js(`!!document.querySelector('[data-cat="comida"] .ox-meter--danger')`));
+  // fmtARS separa el $ con un espacio que no corta: se normaliza para comparar.
+  const textoComida = (await js(`document.querySelector('[data-cat="comida"] .fw-budget__text').textContent`)).replace(/\s/g, ' ');
+  ok('y dice cuánto se pasó', textoComida.includes('te pasaste $ 2.500'), textoComida);
+  ok('aparecen los números del presupuesto', await js(`!!document.querySelector('#bg-kpis [data-k="queda"]')`));
+  ok('el cursor sigue en el campo mientras se tipea', await js(`document.activeElement?.dataset.tope === 'comida'`));
+  ok('el tope quedó en disco', leerDoc('presupuestos')?.topes?.comida === 10000, JSON.stringify(leerDoc('presupuestos')));
+  await tipear('[data-tope="comida"]', 'abc');
+  await sleep(600);
+  ok('un tope que no se entiende se marca y no se guarda',
+    (await js(`document.querySelector('[data-tope="comida"]').classList.contains('is-invalid')`))
+    && leerDoc('presupuestos')?.topes?.comida === 10000);
+  await tipear('[data-tope="comida"]', '');
+  await sleep(700);
+  ok('vaciar el campo saca el tope', leerDoc('presupuestos')?.topes?.comida === undefined, JSON.stringify(leerDoc('presupuestos')));
+
+  console.log('\n9-sexies. Metas');
+  await click('[data-view="metas"]');
+  await sleep(800);
+  ok('sin metas, un estado vacío con su botón', await js(`!!document.querySelector('#mt-primera')`));
+  await click('#mt-primera');
+  await sleep(600);
+  ok('el formulario abre dentro de la ventana', dentro(await rect('.ox-modal')));
+  ok('y arranca escribiendo el nombre', await js(`document.activeElement?.dataset.f === 'nombre'`));
+  const confirmar = () => js(`document.querySelector('.ox-modal__foot .ox-btn--primary')?.disabled`);
+  ok('vacío no se puede crear', (await confirmar()) === true);
+  await tipear('[data-f="nombre"]', 'Viaje de humo');
+  await tipear('[data-f="objetivo"]', '100.000');
+  await sleep(150);
+  ok('completo sí', (await confirmar()) === false);
+  await click('.ox-modal__foot .ox-btn--primary');
+  await sleep(900);
+  ok('la meta aparece en su tarjeta', (await js(`document.querySelectorAll('.fw-meta').length`)) === 1);
+  ok('y queda en disco', leerDoc('metas')?.metas?.[0]?.objetivo === 100000, JSON.stringify(leerDoc('metas')));
+
+  // Ir y volver: un listener enganchado de más abriría dos modales con un click.
+  await click('[data-view="resumen"]');
+  await sleep(500);
+  await click('[data-view="metas"]');
+  await sleep(800);
+  await click('[data-accion="aportar"]');
+  await sleep(600);
+  ok('al volver, aportar abre UN solo diálogo', (await js(`document.querySelectorAll('.ox-modal').length`)) === 1);
+  await tipear('[data-f="monto"]', '25.000');
+  await sleep(150);
+  await click('.ox-modal__foot .ox-btn--primary');
+  await sleep(900);
+  const ahorrado = (await js(`document.querySelector('.fw-meta__ahorrado').textContent.trim()`)).replace(/\s/g, ' ');
+  ok('el aporte suma', ahorrado === '$ 25.000', ahorrado);
+  ok('y se ve en la lista', (await js(`document.querySelectorAll('.fw-meta__aporte').length`)) === 1);
+  ok('y queda en disco', leerDoc('metas')?.metas?.[0]?.aportes?.length === 1);
+  await click('[data-accion="retirar"]');
+  await sleep(600);
+  await tipear('[data-f="monto"]', '30.000');
+  await sleep(150);
+  ok('no deja retirar más de lo juntado', (await confirmar()) === true);
+  await escape();
+  await sleep(500);
+  await click('[data-accion="menu"]');
+  await sleep(400);
+  await js(`[...document.querySelectorAll('.ox-menuitem')].find((b) => b.textContent.includes('Borrar'))?.click()`);
+  await sleep(600);
+  await click('.ox-modal .ox-btn--danger-solid');
+  await sleep(1000);
+  ok('borrar la meta vuelve al estado vacío', await js(`!!document.querySelector('#mt-primera')`));
+  ok('y la saca del disco', leerDoc('metas')?.metas?.length === 0);
+
+  await click('[data-view="movimientos"]');
+  await sleep(700);
+
   console.log('\n10. Nada nativo de Chromium, nada de glifos');
   ok('ningún title= nativo', (await js(`document.querySelectorAll('[title]').length`)) === 0,
     await js(`[...document.querySelectorAll('[title]')].map(e => e.tagName).join(', ')`));

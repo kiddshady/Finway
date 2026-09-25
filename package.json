@@ -14,7 +14,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "test": "node test/tokens.test.mjs && node test/store.test.mjs && node test/format.test.mjs && node test/dominio-format.test.mjs && node test/movimientos.test.mjs",
+    "test": "node test/tokens.test.mjs && node test/store.test.mjs && node test/format.test.mjs && node test/dominio-format.test.mjs && node test/movimientos.test.mjs && node test/plan.test.mjs",
     "smoke": "electron test/renderer.test.cjs",
     "icons": "electron tools/iconos.mjs",
     "dist": "electron-builder --win",
