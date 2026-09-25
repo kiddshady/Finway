@@ -178,6 +178,12 @@
 .fw-readout__out { color: var(--ox-text-2); font-variant-numeric: tabular-nums }
 .fw-readout__net { margin-left: auto; color: var(--ox-text-2); font-variant-numeric: tabular-nums }
 .fw-readout__hint { margin-left: auto; color: var(--ox-text-4) }
+/* El delta contra el mes anterior sí va teñido: acá el color no dice de qué
+   serie es, dice si el cambio es bueno (verde) o malo (rojo). */
+.fw-readout__delta { margin-left: auto; display: inline-flex; align-items: baseline; gap: 6px; color: var(--ox-text-3); font-variant-numeric: tabular-nums }
+.fw-readout__delta--good { color: var(--fw-in) }
+.fw-readout__delta--bad  { color: var(--fw-out) }
+.fw-readout__pct { font-family: var(--ox-mono); font-size: var(--ox-fs-10); opacity: .75 }
 .fw-key { display: inline-flex; align-items: center; gap: 6px; color: var(--ox-text-4) }
 .fw-key__line { width: 14px; height: 2px; border-radius: 1px; background: currentColor }
 .fw-key__dot  { width: 8px; height: 8px; border-radius: 2px; background: currentColor }

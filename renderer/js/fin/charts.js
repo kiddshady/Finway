@@ -145,6 +145,15 @@ export function lineHTML(cur, prev, todayDay, { id = 'line', kind = 'out' } = {}
   const xLabels = [...new Set([1, 10, 20, maxDays])].map((d) =>
     `<text class="fw-tick" x="${x(d).toFixed(1)}" y="${LH - 8}" text-anchor="middle">${d}</text>`).join('');
 
+  /* En reposo, el delta del último punto dibujado: hoy si es el mes en curso,
+     el cierre si es un mes pasado. Un mes pasado se compara cierre contra
+     cierre, aunque uno tenga 30 días y el otro 31. */
+  const lastDay = curDrawn.length;
+  const idleDelta = lastDay && prev.length
+    ? deltaHTML(curDrawn[lastDay - 1], prev[(todayDay ? Math.min(lastDay, prev.length) : prev.length) - 1],
+        kind, todayDay ? 'HOY' : 'AL CIERRE')
+    : '';
+
   return `
     <div class="fw-line fw-line--${kind}" data-max-days="${maxDays}">
       <svg viewBox="0 0 ${LW} ${LH}" class="fw-chart" id="${id}-svg">
@@ -175,8 +184,26 @@ export function lineHTML(cur, prev, todayDay, { id = 'line', kind = 'out' } = {}
       <div class="fw-readout" id="${id}-readout">
         <span class="fw-key fw-key--${kind}"><i class="fw-key__line"></i> este mes</span>
         <span class="fw-key fw-key--prev"><i class="fw-key__line"></i> mes anterior</span>
+        ${idleDelta}
       </div>
     </div>`;
+}
+
+/* Cuánto se movió este mes contra el anterior, a la misma altura del mes.
+   El color dice si es bueno o malo, no de qué serie es: más drenaje es malo,
+   más ingreso es bueno. Sin mes anterior (0) no hay % que valga. */
+function deltaHTML(vCur, vPrev, kind, label = '') {
+  const tag = label ? `<span class="fw-readout__label">${label}</span>` : '';
+  const d = vCur - vPrev;
+  if (Math.abs(d) < 0.005) return `<span class="fw-readout__delta">${tag}= igual</span>`;
+  const good = kind === 'in' ? d > 0 : d < 0;
+  const pct = vPrev > 0 ? (d / vPrev) * 100 : null;
+  const pctTxt = pct == null ? ''
+    : `<span class="fw-readout__pct">${d > 0 ? '+' : '−'}${Math.abs(pct) < 10
+        ? Math.abs(pct).toFixed(1).replace('.', ',')
+        : Math.round(Math.abs(pct))}%</span>`;
+  return `<span class="fw-readout__delta fw-readout__delta--${good ? 'good' : 'bad'}">
+            ${tag}${d > 0 ? '+' : ''}${fmtARS(d)}${pctTxt}</span>`;
 }
 
 export function wireLine(root, cur, prev, todayDay, { id = 'line', kind = 'out' } = {}) {
@@ -214,7 +241,8 @@ export function wireLine(root, cur, prev, todayDay, { id = 'line', kind = 'out' 
     readout.innerHTML = `
       <span class="fw-readout__label">DÍA ${String(day).padStart(2, '0')}</span>
       ${vCur != null ? `<span class="fw-readout__${kind}">${fmtARS(vCur)}</span>` : ''}
-      ${vPrev != null ? `<span class="ox-dim">mes ant. ${fmtARS(vPrev)}</span>` : ''}`;
+      ${vPrev != null ? `<span class="ox-dim">mes ant. ${fmtARS(vPrev)}</span>` : ''}
+      ${vCur != null && vPrev != null ? deltaHTML(vCur, vPrev, kind) : ''}`;
   });
 
   svg.addEventListener('mouseleave', () => {
