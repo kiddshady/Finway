@@ -718,7 +718,7 @@
    el foco adentro, y siempre ocupa su lugar para que nada salte de ancho. */
 .fw-calc__del { opacity: 0; transition: opacity var(--ox-t-1) var(--ox-ease-soft), background-color var(--ox-t-1) var(--ox-ease-soft), color var(--ox-t-1) var(--ox-ease-soft); }
 .fw-calc__row:hover .fw-calc__del,
-.fw-calc__row:focus-within .fw-calc__del,
+.fw-calc__row:has(:focus-visible) .fw-calc__del,
 .fw-calc__del:focus-visible { opacity: 1; }
 .fw-calc__add {
   display: flex;
@@ -892,7 +892,7 @@
 /* El tacho, como en la calculadora: con la fila bajo el mouse o con foco. */
 .fw-meta__del { opacity: 0; transition: opacity var(--ox-t-1) var(--ox-ease-soft), background-color var(--ox-t-1) var(--ox-ease-soft), color var(--ox-t-1) var(--ox-ease-soft); }
 .fw-meta__aporte:hover .fw-meta__del,
-.fw-meta__aporte:focus-within .fw-meta__del,
+.fw-meta__aporte:has(:focus-visible) .fw-meta__del,
 .fw-meta__del:focus-visible { opacity: 1; }
 /* El aporte recién cargado se abre en su lugar, y el que se borra se cierra:
    la tarjeta cambia de alto de a poco en vez de saltar. */
