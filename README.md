@@ -119,7 +119,7 @@ las mismas matrices que Chromium y falla si divergieron.
 - **Calculadora**: filas de concepto y monto que se suman al tipear, como un
   `SUMA()` de planilla. Enter pasa al campo siguiente y, en el último monto, abre
   una fila nueva. Un monto que no se entiende queda marcado y no suma. Se pueden
-  abrir hasta cuatro, cada una con su título opcional y su total; «Copiar» deja
+  abrir hasta seis, cada una con su título opcional y su total; «Copiar» deja
   la tabla en el portapapeles separada por tabs, lista para pegar en una
   planilla. Se guardan solas en `calculadora.json`, aparte: **no son
   movimientos** y no tocan el balance.

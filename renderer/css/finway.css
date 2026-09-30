@@ -633,7 +633,7 @@
    Una planilla de dos columnas y un total. Los montos van en mono y alineados
    a la derecha, como en cualquier columna de números: así las cifras quedan
    una debajo de la otra y se comparan de un vistazo. */
-/* Hasta cuatro, en grilla: de a dos cuando la ventana da, una abajo de la otra
+/* Hasta seis, en grilla: de a dos cuando la ventana da, una abajo de la otra
    cuando no. Cada una conserva el ancho máximo que tenía cuando era la única. */
 .fw-calcs {
   /* auto-fill cuenta columnas con el MÁXIMO del minmax: con 620 fijo arriba

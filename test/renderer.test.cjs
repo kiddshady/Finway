@@ -718,24 +718,24 @@ app.whenReady().then(async () => {
   ok('el título encabeza la tabla copiada',
     copiadoConTitulo.startsWith('Mudanza\nConcepto\tMonto\n'), JSON.stringify(copiadoConTitulo));
 
-  /* Hasta cuatro calculadoras, cada una con su propia cuenta. */
+  /* Hasta seis calculadoras, cada una con su propia cuenta. */
   ok('con una sola, la X de cerrar no está a mano',
     await js(`getComputedStyle(document.querySelector('.fw-calc__cerrar')).visibility === 'hidden'`));
-  for (let i = 0; i < 3; i++) { await click('#calc-nueva'); await sleep(300); }
-  ok('se abren hasta cuatro calculadoras', (await js(`document.querySelectorAll('.fw-calc').length`)) === 4);
-  ok('y en la cuarta el botón se deshabilita', await js(`document.getElementById('calc-nueva').disabled`));
+  for (let i = 0; i < 5; i++) { await click('#calc-nueva'); await sleep(300); }
+  ok('se abren hasta seis calculadoras', (await js(`document.querySelectorAll('.fw-calc').length`)) === 6);
+  ok('y en la sexta el botón se deshabilita', await js(`document.getElementById('calc-nueva').disabled`));
   ok('las nuevas se nombran por su lugar, la titulada conserva el suyo',
     (await js(`[...document.querySelectorAll('.fw-calc__titulo')].map((n) => n.value || n.placeholder).join('|')`))
-      === 'Mudanza|Calculadora 2|Calculadora 3|Calculadora 4');
+      === 'Mudanza|Calculadora 2|Calculadora 3|Calculadora 4|Calculadora 5|Calculadora 6');
   await js(`(() => {
     const el = document.querySelectorAll('.fw-calc')[1].querySelector('[data-campo="monto"]');
     el.focus(); el.value = '1000'; el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   ok('la segunda suma aparte', (await totalCalc(1)) === '$ 1.000', await totalCalc(1));
   ok('y la primera no se mueve', (await totalCalc(0)) === '$ 265.500', await totalCalc(0));
 
-  await click('.fw-calc:nth-child(4) .fw-calc__cerrar');
+  await click('.fw-calc:nth-child(6) .fw-calc__cerrar');
   await sleep(500);
-  ok('cerrar una vacía no pregunta', (await js(`document.querySelectorAll('.fw-calc').length`)) === 3
+  ok('cerrar una vacía no pregunta', (await js(`document.querySelectorAll('.fw-calc').length`)) === 5
     && !(await js(`!!document.querySelector('.ox-modal')`)));
   ok('y el botón vuelve a estar disponible', !(await js(`document.getElementById('calc-nueva').disabled`)));
   await click('.fw-calc:nth-child(2) .fw-calc__cerrar');
@@ -743,10 +743,9 @@ app.whenReady().then(async () => {
   ok('cerrar una con datos pide confirmación', dentro(await rect('.ox-modal')));
   await click('.ox-modal .ox-btn--danger-solid');
   await sleep(800);
-  ok('y se va, dejando las demás', (await js(`document.querySelectorAll('.fw-calc').length`)) === 2
+  ok('y se va, dejando las demás', (await js(`document.querySelectorAll('.fw-calc').length`)) === 4
     && (await totalCalc(0)) === '$ 265.500', await totalCalc(0));
-  await click('.fw-calc:nth-child(2) .fw-calc__cerrar');
-  await sleep(600);
+  for (let i = 0; i < 3; i++) { await click('.fw-calc:nth-child(2) .fw-calc__cerrar'); await sleep(600); }
   ok('queda una sola y sin X', (await js(`document.querySelectorAll('.fw-calc').length`)) === 1);
 
   await click('[data-view="resumen"]');

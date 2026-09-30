@@ -22,7 +22,7 @@ import { fmtARS, parseAmount } from './format.js';
 
 const DOC = 'calculadora';
 const FILAS_INICIALES = 3;
-export const MAX_CALCS = 4;
+export const MAX_CALCS = 6;
 
 let calcs = [];
 let guardadoPendiente = null;
