@@ -18,7 +18,7 @@
 
 import { catColor, catLabel } from './categories.js';
 import { fmtARS, fmtCompact, monthShort } from './format.js';
-import { frase } from './vivo.js';
+import { frase } from '../motion.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

@@ -12,9 +12,8 @@
 import { Icons } from '../icons.js';
 import { Menu, Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
-import { exit, raf2, stagger, swap } from '../motion.js';
+import { exit, frase, raf2, stagger, swap } from '../motion.js';
 import { empty, esc, head, paint, viewEl } from '../ui.js';
-import { frase } from './vivo.js';
 import { currentMonth, dayLabel, fmtARS, monthTitle, parseAmount, shiftMonth, todayStr } from './format.js';
 import { ahorradoDe, estadoMeta } from './plan.js';
 import { monthTotals } from './stats.js';

@@ -8,12 +8,11 @@
 import { Icons } from './icons.js';
 import { Menu, Tooltip } from './overlays.js';
 import Router from './router.js';
-import { initClickFlash, initScrollFades, raf2, swap } from './motion.js';
+import { frase, initClickFlash, initScrollFades, numero, raf2, swap } from './motion.js';
 import { colorToken, empty, paint } from './ui.js';
 import { relTime } from './format.js';
 import { fmtARS, monthTitle } from './fin/format.js';
 import { markSVG } from './fin/mark.js';
-import { frase, numero } from './fin/vivo.js';
 import { monthTotals } from './fin/stats.js';
 import { loadAll, refresh, S, setOnChrome, setOnSaved } from './fin/state.js';
 import { focusCarga, viewMovimientos, viewResumen } from './fin/views.js';
@@ -57,7 +56,7 @@ Router.define({
 /* ══ El chrome: todo lo que vive fuera de la vista ═══════════════════════════ */
 
 /* Todo lo de acá cambia con la app andando: los números destellan en su lugar
-   y las frases hacen relevo (fin/vivo.js). Antes eran textContent e innerHTML
+   y las frases hacen relevo (numero y frase, en motion.js). Antes eran textContent e innerHTML
    a secas y cambiaban de un cuadro al otro. */
 function updateChrome() {
   const t = monthTotals(S.moves, S.month);

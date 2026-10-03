@@ -10,7 +10,7 @@
 import { Icons } from '../icons.js';
 import { Menu, Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
-import { bindSwitcher, stagger, swap } from '../motion.js';
+import { bindSwitcher, frase, reconcile, swap } from '../motion.js';
 import { esc, head, paint, viewEl } from '../ui.js';
 import { catColor, catLabel, catsFor } from './categories.js';
 import { barsHTML, donutHTML, lineHTML, wireBars, wireDonut, wireLine } from './charts.js';
@@ -20,7 +20,6 @@ import { QuickAdd, quickAddHTML, syncQuickAdd, wireQuickAdd } from './quickadd.j
 import { byCategory, categoryTrend, cumulativeFlow, monthlyFlow, monthTotals, movesOf } from './stats.js';
 import { trendHTML, wireTrend } from './trend.js';
 import { chromeChanged, exportAll, exportCsv, removeMove, S, saveMove } from './state.js';
-import { frase } from './vivo.js';
 
 /* ══ Navegación de mes ═══════════════════════════════════════════════════════
    Va en las acciones del encabezado, así el título dice qué mes es y los
@@ -220,25 +219,17 @@ function catMenu(anchor) {
   Menu.show(anchor, items);
 }
 
-/* `entrada`: las filas entran escalonadas al pintar la vista. Al rehacer la
-   tabla (filtro, categoría) no: la tabla nueva va quieta debajo del fundido, y
-   si cada fila volviera a entrar la tabla entera pasaría por media luz. */
-function rowsHTML(list, { entrada = true } = {}) {
-  if (!list.length) {
-    return `<tr><td colspan="5" style="padding:0">
-      <div class="ox-empty">
-        <span class="fw-empty-mark">${markSVG({ size: 40, cls: 'fw-mark--dim' })}</span>
-        <div class="ox-empty__title">Sin movimientos este mes</div>
-        <div class="ox-empty__text">${S.cat
-          ? 'No hay movimientos de esta categoría. Probá con otra o volvé a todas.'
-          : S.filter === 'all'
-            ? 'Todavía no se drenó nada. Cargá el primero con el formulario de la derecha.'
-            : 'No hay movimientos de este tipo. Probá con otro filtro.'}</div>
-      </div></td></tr>`;
-  }
+/* ══ Las filas, por clave ════════════════════════════════════════════════════
+   La tabla se pone al día con reconcile() (motion.js): una pieza por
+   movimiento, con su id de clave, o el vacío. Al filtrar, borrar o cambiar de
+   categoría, las filas que siguen son el MISMO nodo y viajan a su lugar, las
+   que se van se esfuman desde donde estaban y las nuevas entran. Antes era un
+   innerHTML del tbody (todo volvía a entrar escalonado), y después un fundido
+   de la tabla entera, en el que las filas que cambiaban de lugar se cruzaban
+   con las de al lado. */
 
-  return list.map((m) => `
-    <tr class="ox-tr${entrada ? ' ox-in-fade' : ''}${QuickAdd.editing?.id === m.id ? ' is-editing' : ''}" data-id="${esc(m.id)}">
+const filaHTML = (m) => `
+    <tr class="ox-tr${QuickAdd.editing?.id === m.id ? ' is-editing' : ''}" data-id="${esc(m.id)}">
       <td class="ox-mono ox-dim" style="width:1%;white-space:nowrap">${dayLabel(m.date)}</td>
       <td style="width:1%">
         <span class="fw-cat"><span class="fw-dot" style="background:${catColor(m.category)}"></span>${esc(catLabel(m.category))}</span>
@@ -253,16 +244,26 @@ function rowsHTML(list, { entrada = true } = {}) {
           <button class="ox-iconbtn ox-iconbtn--sm" data-del="${esc(m.id)}" data-tip="Borrar"><i data-icon="trash"></i></button>
         </div>
       </td>
-    </tr>`).join('');
-}
+    </tr>`;
 
-const tablaHTML = (list, opciones) => `
-  <table class="ox-table">
-    <thead><tr>
-      <th>Fecha</th><th>Categoría</th><th>Nota</th><th class="ox-td--num">Monto</th><th></th>
-    </tr></thead>
-    <tbody id="mv-rows">${rowsHTML(list, opciones)}</tbody>
-  </table>`;
+const vacioHTML = () => `
+    <tr><td colspan="5" style="padding:0">
+      <div class="ox-empty">
+        <span class="fw-empty-mark">${markSVG({ size: 40, cls: 'fw-mark--dim' })}</span>
+        <div class="ox-empty__title">Sin movimientos este mes</div>
+        <div class="ox-empty__text">${S.cat
+          ? 'No hay movimientos de esta categoría. Probá con otra o volvé a todas.'
+          : S.filter === 'all'
+            ? 'Todavía no se drenó nada. Cargá el primero con el formulario de la derecha.'
+            : 'No hay movimientos de este tipo. Probá con otro filtro.'}</div>
+      </div></td></tr>`;
+
+const filasDe = (list) => (list.length
+  ? list.map((m) => ({ key: m.id, html: filaHTML(m) }))
+  : [{ key: '__vacio', html: vacioHTML() }]);
+
+/** Pone las filas al día por clave; las nuevas montan sus íconos al nacer. */
+const pintarFilas = (tbody, list) => reconcile(tbody, filasDe(list), { created: (el) => Icons.mount(el) });
 
 export function viewMovimientos() {
   const list = filtered();
@@ -283,7 +284,12 @@ export function viewMovimientos() {
     + `<div class="ox-viewbody">
          <div class="ox-viewbody__main">
            <div class="ox-scroll ox-grow">
-             <div id="mv-tabla">${tablaHTML(list)}</div>
+             <table class="ox-table">
+               <thead><tr>
+                 <th>Fecha</th><th>Categoría</th><th>Nota</th><th class="ox-td--num">Monto</th><th></th>
+               </tr></thead>
+               <tbody id="mv-rows"></tbody>
+             </table>
            </div>
          </div>
          <aside class="ox-inspector">
@@ -296,6 +302,9 @@ export function viewMovimientos() {
   );
 
   const root = viewEl();
+  // Las filas nacen por reconcile(), con su entrada escalonada: así cada una
+  // ya sabe su clave y su html, y el primer filtro no la rehace.
+  pintarFilas(root.querySelector('#mv-rows'), list);
   wireMonthNav(root, () => Router.refresh());
   bindSwitcher(root.querySelector('#mv-filter'), (value) => {
     S.filter = value;
@@ -313,22 +322,18 @@ export function viewMovimientos() {
   btnExport.addEventListener('click', () => exportMenu(btnExport));
   wireRows(root);
   wireInspector(root);
-  stagger(root.querySelector('#mv-rows'));
   QuickAdd.focusAmount(root);
 }
 
-/** Rehace SOLO la tabla (filtro, categoría). Repintando la vista entera se
-    perdería el foco del campo de monto, que es exactamente donde el usuario
-    quiere seguir. Es un fundido: la tabla vieja se esfuma encima de la nueva,
-    que está quieta debajo. Antes era un innerHTML del tbody: lo viejo se iba en
-    un cuadro y todas las filas volvían a entrar escalonadas. */
+/** Pone al día SOLO las filas (filtro, categoría, borrar). Repintando la vista
+    entera se perdería el foco del campo de monto, que es exactamente donde el
+    usuario quiere seguir. */
 function repaintRows() {
   const root = viewEl();
+  const tbody = root.querySelector('#mv-rows');
+  if (!tbody) return;
   const list = filtered();
-  const caja = root.querySelector('#mv-tabla');
-  if (!caja) return;
-  swap(caja, tablaHTML(list, { entrada: false }), { fundido: true });
-  Icons.mount(caja);
+  pintarFilas(tbody, list);
   ponerAlDia(root, list);
 }
 
@@ -355,24 +360,6 @@ function syncInspector(root, { focus = true } = {}) {
   frase(root.querySelector('.ox-inspector__head .ox-label'),
     QuickAdd.editing ? 'Editar movimiento' : 'Cargar movimiento');
   if (focus) QuickAdd.focusAmount(root);
-}
-
-/** Saca una fila esfumándola, y las de abajo suben deslizándose (FLIP) en vez
-    de saltar al hueco. */
-async function quitarFila(tr) {
-  const siguen = [];
-  for (let n = tr.nextElementSibling; n; n = n.nextElementSibling) siguen.push(n);
-  const salida = tr.animate([{ opacity: 1 }, { opacity: 0 }],
-    { duration: 160, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'forwards' });
-  await salida.finished.catch(() => {});
-  const antes = siguen.map((n) => n.getBoundingClientRect().top);
-  tr.remove();
-  siguen.forEach((n, i) => {
-    const dy = antes[i] - n.getBoundingClientRect().top;
-    if (Math.abs(dy) < 0.5) return;
-    n.animate([{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }],
-      { duration: 240, easing: 'cubic-bezier(.16, 1, .3, 1)' });
-  });
 }
 
 /* El cableado del inspector deja listeners fuera de la vista (el calendario
@@ -422,12 +409,9 @@ function wireRows(root) {
     if (!ok) return;
     if (!await removeMove(m.id)) return;
     if (QuickAdd.editing?.id === m.id) { QuickAdd.reset(); syncInspector(root, { focus: false }); }
-    /* La fila se va sola y las de abajo suben. Si era la última que quedaba,
-       la tabla pasa al vacío con fundido. */
-    const tr = root.querySelector(`#mv-rows .ox-tr[data-id="${CSS.escape(m.id)}"]`);
-    const list = filtered();
-    if (tr && list.length) { ponerAlDia(root, list); quitarFila(tr); }
-    else repaintRows();
+    // La fila se esfuma desde donde estaba y las de abajo suben (reconcile);
+    // si era la última, entra el vacío.
+    repaintRows();
     Toast.show({ title: 'Movimiento borrado', icon: 'trash' });
   };
 

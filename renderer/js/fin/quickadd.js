@@ -10,11 +10,10 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { Icons } from '../icons.js';
-import { bindSwitcher, exit, swap } from '../motion.js';
+import { bindSwitcher, exit, frase, swap } from '../motion.js';
 import { esc } from '../ui.js';
 import { catColor, catsFor } from './categories.js';
 import { parseAmount, todayStr, shiftMonth, daysInMonth } from './format.js';
-import { frase } from './vivo.js';
 
 const DOW = ['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO'];
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',

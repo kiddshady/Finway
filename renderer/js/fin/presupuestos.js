@@ -13,9 +13,8 @@
 
 import { Toast } from '../overlays.js';
 import Router from '../router.js';
-import { stagger, swap } from '../motion.js';
+import { frase, numero, stagger, swap } from '../motion.js';
 import { esc, head, paint, viewEl } from '../ui.js';
-import { frase, numero } from './vivo.js';
 import { catColor, catLabel } from './categories.js';
 import { fmtARS, monthTitle, parseAmount } from './format.js';
 import { monthNavHTML, wireMonthNav } from './views.js';

@@ -16,10 +16,9 @@
 import { Icons } from '../icons.js';
 import { Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
-import { exit, stagger } from '../motion.js';
+import { exit, frase, numero, stagger } from '../motion.js';
 import { esc, head, paint, viewEl } from '../ui.js';
 import { fmtARS, parseAmount } from './format.js';
-import { frase, numero } from './vivo.js';
 
 const DOC = 'calculadora';
 const FILAS_INICIALES = 3;

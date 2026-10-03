@@ -128,6 +128,13 @@ app.whenReady().then(async () => {
   ok('la marca está en la titlebar', dentro(await rect('#brand-mark svg')));
   // La titlebar es la de Onyx: marca y nombre. La versión vive en Ajustes.
   ok('la titlebar no muestra la versión', !(await js(`!!document.getElementById('brand-version')`)));
+  /* El primer llenado de los contadores no es un cambio: no destella. En
+     0.8.5 arrancaban en «0» y «—» en el HTML, el primer dato contaba como
+     cambio, y el contador y el balance quedaban teñidos de acento mientras se
+     iba el splash. tick() deja la clase puesta, así que se ve después. */
+  const destellados = await js(`['#stat-count', '#stat-balance', '[data-view="movimientos"] .ox-navitem__count']
+    .filter((s) => document.querySelector(s)?.classList.contains('ox-ticked'))`);
+  ok('al arrancar, los contadores no destellan', destellados.length === 0, destellados.join(' | '));
 
   console.log('\n2. El color que la app le manda a su propia ventana');
   const hex = await js(`(async () => (await import('./js/ui.js')).colorToken('--ox-bg'))()`);
@@ -1103,25 +1110,34 @@ app.whenReady().then(async () => {
   await click('[data-view="movimientos"]');
   await sleep(900);
 
-  /* Filtrar: fundido sobre la tabla, y las filas nuevas enteras desde el
-     primer cuadro. Antes: innerHTML del tbody y todas re-entrando escalonadas. */
+  /* Filtrar: las filas que siguen son el MISMO nodo (no vuelven a entrar) y las
+     que se van se esfuman fuera del flujo, con el ancho de sus celdas. Antes:
+     innerHTML del tbody y todas re-entrando escalonadas; después, un fundido
+     de la tabla entera, en el que las filas que cambiaban de lugar se cruzaban. */
   const filtro = await js(`(async () => {
-    const caja = document.getElementById('mv-tabla');
-    if (!caja) return { sinCaja: true };
+    const tbody = document.getElementById('mv-rows');
+    const vivas = () => [...tbody.querySelectorAll(':scope > .ox-tr:not([data-state="closing"])')];
+    const antes = new Map(vivas().map((tr) => [tr.dataset.id, tr]));
+    const celdas = (tr) => [...tr.cells].map((c) => Math.round(c.getBoundingClientRect().width));
+    const anchosAntes = new Map([...antes].map(([id, tr]) => [id, celdas(tr)]));
     document.querySelector('#mv-filter [data-value="expense"]').click();
-    const calco = caja.querySelector(':scope > .ox-swap-out--fundido');
-    let minimo = 1; let vistas = 0;
-    const t0 = performance.now();
-    while (performance.now() - t0 < 300) {
-      for (const f of caja.querySelectorAll(':scope > table .ox-tr')) { vistas++; minimo = Math.min(minimo, +getComputedStyle(f).opacity); }
-      await new Promise((r) => requestAnimationFrame(r));
-    }
+    const saliendo = [...tbody.querySelectorAll(':scope > [data-state="closing"]')];
+    const quedan = vivas();
+    const r = {
+      saliendo: saliendo.length, quedan: quedan.length,
+      mismos: quedan.length > 0 && quedan.every((tr) => antes.get(tr.dataset.id) === tr),
+      afuera: saliendo.every((tr) => getComputedStyle(tr).position === 'absolute'),
+      celdas: saliendo.every((tr) => celdas(tr).every((w, i) => Math.abs(w - anchosAntes.get(tr.dataset.id)[i]) <= 1)),
+    };
+    await new Promise((ok) => setTimeout(ok, 500));
+    r.alFinal = tbody.querySelectorAll(':scope > [data-state="closing"]').length;
     document.querySelector('#mv-filter [data-value="all"]').click();
-    await new Promise((r) => setTimeout(r, 400));
-    return { calco: !!calco, minimo, vistas };
+    await new Promise((ok) => setTimeout(ok, 500));
+    return r;
   })()`);
-  ok('filtrar la tabla es un fundido', filtro.calco, JSON.stringify(filtro));
-  ok('y las filas nuevas no vuelven a entrar', filtro.vistas > 0 && filtro.minimo === 1, JSON.stringify(filtro));
+  ok('filtrar: las filas que siguen son las mismas (no vuelven a entrar)', filtro.mismos, JSON.stringify(filtro));
+  ok('y las que se van se esfuman fuera del flujo, con el ancho de sus celdas',
+    filtro.saliendo > 0 && filtro.afuera && filtro.celdas && filtro.alFinal === 0, JSON.stringify(filtro));
 
   /* Editar: el formulario y la tabla son los MISMOS nodos; la fila se marca en
      el lugar y el banner se despliega con su transición (antes nacía abierto). */

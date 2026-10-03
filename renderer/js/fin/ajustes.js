@@ -8,9 +8,8 @@
 import { Icons } from '../icons.js';
 import { Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
-import { swap } from '../motion.js';
+import { frase, swap } from '../motion.js';
 import { esc, head, paint, path as recortar, viewEl } from '../ui.js';
-import { frase } from './vivo.js';
 import { fmtARS } from './format.js';
 import { exportAll, importBackup, S } from './state.js';
 import { monthTotals } from './stats.js';
