@@ -10,16 +10,17 @@
 import { Icons } from '../icons.js';
 import { Menu, Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
-import { bindSwitcher, stagger } from '../motion.js';
+import { bindSwitcher, stagger, swap } from '../motion.js';
 import { esc, head, paint, viewEl } from '../ui.js';
 import { catColor, catLabel, catsFor } from './categories.js';
 import { barsHTML, donutHTML, lineHTML, wireBars, wireDonut, wireLine } from './charts.js';
 import { currentMonth, dayLabel, fmtARS, monthTitle, shiftMonth, todayStr } from './format.js';
 import { markSVG } from './mark.js';
-import { QuickAdd, quickAddHTML, wireQuickAdd } from './quickadd.js';
+import { QuickAdd, quickAddHTML, syncQuickAdd, wireQuickAdd } from './quickadd.js';
 import { byCategory, categoryTrend, cumulativeFlow, monthlyFlow, monthTotals, movesOf } from './stats.js';
 import { trendHTML, wireTrend } from './trend.js';
 import { chromeChanged, exportAll, exportCsv, removeMove, S, saveMove } from './state.js';
+import { frase } from './vivo.js';
 
 /* ══ Navegación de mes ═══════════════════════════════════════════════════════
    Va en las acciones del encabezado, así el título dice qué mes es y los
@@ -102,8 +103,11 @@ export function viewResumen() {
            ${kpi('in', 'Ingresos', fmtARS(t.income))}
            ${kpi('out', 'Gastos', fmtARS(t.expense))}
            ${kpi('bal', 'Balance', fmtARS(t.balance))}
-           ${kpi('rate', 'Drenaje diario', fmtARS(t.rate),
-             t.projection > 0 ? `proyección a fin de mes ${fmtARS(t.projection)}` : '')}
+           ${/* Sin proyección (un mes pasado) el renglón queda reservado: si se
+                 plegara, todo lo de abajo subiría un renglón al cambiar de mes y
+                 el fundido mostraría los títulos de las cards dos veces, corridos. */
+             kpi('rate', 'Drenaje diario', fmtARS(t.rate),
+             t.projection > 0 ? `proyección a fin de mes ${fmtARS(t.projection)}` : '&nbsp;')}
          </div>
          <div class="fw-charts">
            ${card('Gastos por categoría', donutHTML(cats, t.expense), false, { tall: true })}
@@ -130,14 +134,17 @@ export function viewResumen() {
   wireTrend(root, trend, trendSel(trend), trendPick);
 
   // El rango repinta SOLO la tendencia: remontar la vista entera reiniciaría
-  // las animaciones de entrada de los otros gráficos.
+  // las animaciones de entrada de los otros gráficos. Con fundido: el gráfico
+  // viejo se esfuma encima mientras el nuevo se dibuja debajo (antes era un
+  // innerHTML y el viejo se iba en un cuadro).
   bindSwitcher(root.querySelector('#trend-range'), (value) => {
     S.trendRange = Number(value);
     const body = root.querySelector('#trend-card .ox-card__body');
     const t = categoryTrend(S.moves, S.month, S.trendRange);
     const sel = trendSel(t);
-    body.innerHTML = trendHTML(t, sel);
-    wireTrend(root, t, sel, trendPick);
+    swap(body, trendHTML(t, sel), { fundido: true });
+    // El de :scope: durante el fundido el gráfico viejo sigue adentro, en el calco.
+    wireTrend(body.querySelector(':scope > .fw-trend'), t, sel, trendPick);
   });
 }
 
@@ -190,7 +197,8 @@ function paintCatFilter(root) {
   btn.classList.toggle('is-set', !!S.cat);
   // El puntito conserva el color al apagarse: así se desvanece, no se vacía.
   if (S.cat) btn.querySelector('.fw-catfilter__dot').style.background = catColor(S.cat);
-  btn.querySelector('.ox-select__value').textContent = S.cat ? catLabel(S.cat) : 'Todas las categorías';
+  // Un nombre por otro: relevo en el lugar, no un textContent en seco.
+  frase(btn.querySelector('.ox-select__value'), esc(S.cat ? catLabel(S.cat) : 'Todas las categorías'));
 }
 
 function catMenu(anchor) {
@@ -212,7 +220,10 @@ function catMenu(anchor) {
   Menu.show(anchor, items);
 }
 
-function rowsHTML(list) {
+/* `entrada`: las filas entran escalonadas al pintar la vista. Al rehacer la
+   tabla (filtro, categoría) no: la tabla nueva va quieta debajo del fundido, y
+   si cada fila volviera a entrar la tabla entera pasaría por media luz. */
+function rowsHTML(list, { entrada = true } = {}) {
   if (!list.length) {
     return `<tr><td colspan="5" style="padding:0">
       <div class="ox-empty">
@@ -227,7 +238,7 @@ function rowsHTML(list) {
   }
 
   return list.map((m) => `
-    <tr class="ox-tr ox-in-fade${QuickAdd.editing?.id === m.id ? ' is-editing' : ''}" data-id="${esc(m.id)}">
+    <tr class="ox-tr${entrada ? ' ox-in-fade' : ''}${QuickAdd.editing?.id === m.id ? ' is-editing' : ''}" data-id="${esc(m.id)}">
       <td class="ox-mono ox-dim" style="width:1%;white-space:nowrap">${dayLabel(m.date)}</td>
       <td style="width:1%">
         <span class="fw-cat"><span class="fw-dot" style="background:${catColor(m.category)}"></span>${esc(catLabel(m.category))}</span>
@@ -244,6 +255,14 @@ function rowsHTML(list) {
       </td>
     </tr>`).join('');
 }
+
+const tablaHTML = (list, opciones) => `
+  <table class="ox-table">
+    <thead><tr>
+      <th>Fecha</th><th>Categoría</th><th>Nota</th><th class="ox-td--num">Monto</th><th></th>
+    </tr></thead>
+    <tbody id="mv-rows">${rowsHTML(list, opciones)}</tbody>
+  </table>`;
 
 export function viewMovimientos() {
   const list = filtered();
@@ -264,12 +283,7 @@ export function viewMovimientos() {
     + `<div class="ox-viewbody">
          <div class="ox-viewbody__main">
            <div class="ox-scroll ox-grow">
-             <table class="ox-table">
-               <thead><tr>
-                 <th>Fecha</th><th>Categoría</th><th>Nota</th><th class="ox-td--num">Monto</th><th></th>
-               </tr></thead>
-               <tbody id="mv-rows">${rowsHTML(list)}</tbody>
-             </table>
+             <div id="mv-tabla">${tablaHTML(list)}</div>
            </div>
          </div>
          <aside class="ox-inspector">
@@ -303,35 +317,62 @@ export function viewMovimientos() {
   QuickAdd.focusAmount(root);
 }
 
-/** Repinta SOLO las filas. Repintando la vista entera se perdería el foco del
-    campo de monto, que es exactamente donde el usuario quiere seguir. */
+/** Rehace SOLO la tabla (filtro, categoría). Repintando la vista entera se
+    perdería el foco del campo de monto, que es exactamente donde el usuario
+    quiere seguir. Es un fundido: la tabla vieja se esfuma encima de la nueva,
+    que está quieta debajo. Antes era un innerHTML del tbody: lo viejo se iba en
+    un cuadro y todas las filas volvían a entrar escalonadas. */
 function repaintRows() {
   const root = viewEl();
   const list = filtered();
-  const body = root.querySelector('#mv-rows');
-  if (!body) return;
-  body.innerHTML = rowsHTML(list);
-  Icons.mount(body);
-  stagger(body);
+  const caja = root.querySelector('#mv-tabla');
+  if (!caja) return;
+  swap(caja, tablaHTML(list, { entrada: false }), { fundido: true });
+  Icons.mount(caja);
+  ponerAlDia(root, list);
+}
 
-  const sub = root.querySelector('.ox-viewhead__sub');
-  if (sub) sub.textContent = subOf(list);
+/** Lo de alrededor de la tabla: el subtítulo (cuántos, y cuánto suman con
+    una categoría elegida) y el botón de exportar. */
+function ponerAlDia(root, list = filtered()) {
+  frase(root.querySelector('.ox-viewhead__sub'), esc(subOf(list)));
   root.querySelector('#mv-export').disabled = !S.moves.length;
 }
 
-/** Repinta el inspector: hace falta cuando cambia el catálogo de categorías
-    (al cambiar de tipo) o cuando se entra o sale del modo edición. */
-function repaintInspector({ focus = true } = {}) {
-  const root = viewEl();
-  const box = root.querySelector('#mv-inspector');
-  if (!box) return;
-  box.innerHTML = quickAddHTML();
-  Icons.mount(box);
-  wireInspector(root);
+/** La fila que se está editando se marca en el lugar: rehacer la tabla para
+    eso hacía volver a entrar todas las filas. */
+function marcarEdicion(root) {
+  root.querySelectorAll('#mv-rows .ox-tr').forEach((tr) =>
+    tr.classList.toggle('is-editing', tr.dataset.id === QuickAdd.editing?.id));
+}
 
-  const label = root.querySelector('.ox-inspector__head .ox-label');
-  if (label) label.textContent = QuickAdd.editing ? 'Editar movimiento' : 'Cargar movimiento';
+/** Pone el inspector al día EN EL LUGAR: el banner de edición se despliega,
+    la cápsula del tipo viaja, las categorías hacen relevo si cambió el
+    catálogo. Antes se rehacía entero con innerHTML: todo cambiaba de golpe y
+    el banner nacía ya abierto, así que su despliegue nunca corría. */
+function syncInspector(root, { focus = true } = {}) {
+  syncQuickAdd(root);
+  frase(root.querySelector('.ox-inspector__head .ox-label'),
+    QuickAdd.editing ? 'Editar movimiento' : 'Cargar movimiento');
   if (focus) QuickAdd.focusAmount(root);
+}
+
+/** Saca una fila esfumándola, y las de abajo suben deslizándose (FLIP) en vez
+    de saltar al hueco. */
+async function quitarFila(tr) {
+  const siguen = [];
+  for (let n = tr.nextElementSibling; n; n = n.nextElementSibling) siguen.push(n);
+  const salida = tr.animate([{ opacity: 1 }, { opacity: 0 }],
+    { duration: 160, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'forwards' });
+  await salida.finished.catch(() => {});
+  const antes = siguen.map((n) => n.getBoundingClientRect().top);
+  tr.remove();
+  siguen.forEach((n, i) => {
+    const dy = antes[i] - n.getBoundingClientRect().top;
+    if (Math.abs(dy) < 0.5) return;
+    n.animate([{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }],
+      { duration: 240, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+  });
 }
 
 /* El cableado del inspector deja listeners fuera de la vista (el calendario
@@ -342,8 +383,8 @@ function wireInspector(root) {
   soltarQuickAdd?.();
   Router.onLeave(() => { soltarQuickAdd?.(); soltarQuickAdd = null; });
   soltarQuickAdd = wireQuickAdd(root, {
-    onTypeChange: () => repaintInspector(),
-    onCancelEdit: () => { QuickAdd.reset(); repaintInspector(); repaintRows(); },
+    onTypeChange: () => syncInspector(root),
+    onCancelEdit: () => { QuickAdd.reset(); syncInspector(root); marcarEdicion(root); },
     onSubmit: async (move) => {
       const editing = !!move.id;
       if (!await saveMove(move)) return;
@@ -366,8 +407,8 @@ function wireRows(root) {
   const startEdit = (m) => {
     if (!m) return;
     QuickAdd.edit(m);
-    repaintInspector();
-    repaintRows();
+    syncInspector(root);
+    marcarEdicion(root);
   };
 
   const confirmDelete = async (m) => {
@@ -380,8 +421,13 @@ function wireRows(root) {
     });
     if (!ok) return;
     if (!await removeMove(m.id)) return;
-    if (QuickAdd.editing?.id === m.id) { QuickAdd.reset(); repaintInspector({ focus: false }); }
-    repaintRows();
+    if (QuickAdd.editing?.id === m.id) { QuickAdd.reset(); syncInspector(root, { focus: false }); }
+    /* La fila se va sola y las de abajo suben. Si era la última que quedaba,
+       la tabla pasa al vacío con fundido. */
+    const tr = root.querySelector(`#mv-rows .ox-tr[data-id="${CSS.escape(m.id)}"]`);
+    const list = filtered();
+    if (tr && list.length) { ponerAlDia(root, list); quitarFila(tr); }
+    else repaintRows();
     Toast.show({ title: 'Movimiento borrado', icon: 'trash' });
   };
 

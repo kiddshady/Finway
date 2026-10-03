@@ -8,11 +8,12 @@
 import { Icons } from './icons.js';
 import { Menu, Tooltip } from './overlays.js';
 import Router from './router.js';
-import { initClickFlash, initScrollFades, raf2 } from './motion.js';
+import { initClickFlash, initScrollFades, raf2, swap } from './motion.js';
 import { colorToken, empty, paint } from './ui.js';
 import { relTime } from './format.js';
 import { fmtARS, monthTitle } from './fin/format.js';
 import { markSVG } from './fin/mark.js';
+import { frase, numero } from './fin/vivo.js';
 import { monthTotals } from './fin/stats.js';
 import { loadAll, refresh, S, setOnChrome, setOnSaved } from './fin/state.js';
 import { focusCarga, viewMovimientos, viewResumen } from './fin/views.js';
@@ -55,24 +56,34 @@ Router.define({
 
 /* ══ El chrome: todo lo que vive fuera de la vista ═══════════════════════════ */
 
+/* Todo lo de acá cambia con la app andando: los números destellan en su lugar
+   y las frases hacen relevo (fin/vivo.js). Antes eran textContent e innerHTML
+   a secas y cambiaban de un cuadro al otro. */
 function updateChrome() {
   const t = monthTotals(S.moves, S.month);
 
-  document.querySelector('[data-view="movimientos"] .ox-navitem__count').textContent = t.count;
-  document.getElementById('stat-count').textContent = t.count;
+  numero(document.querySelector('[data-view="movimientos"] .ox-navitem__count'), t.count);
+  numero(document.getElementById('stat-count'), t.count);
 
   /* El balance de la statusbar no se tiñe: como toda cifra de la app, el signo
      alcanza. (Hasta el 17 sep 2026 tomaba el verde o el rojo del par.) */
-  const balance = document.getElementById('stat-balance');
-  balance.textContent = fmtARS(t.balance);
+  numero(document.getElementById('stat-balance'), fmtARS(t.balance));
 
-  const saved = document.querySelector('#stat-saved .ox-statusbar__value');
-  if (saved) saved.textContent = S.lastSaved ? relTime(S.lastSaved) : '—';
+  frase(document.querySelector('#stat-saved .ox-statusbar__value'), S.lastSaved ? relTime(S.lastSaved) : '—');
 
   /* El mes en la titlebar: las dos vistas hablan del mismo mes, y tenerlo
-     arriba evita la pregunta «¿esto de cuándo es?» al volver de otra ventana. */
-  document.getElementById('titlebar-context').innerHTML =
-    `${Icons.svg('calendar', 'ox-icon--sm')}<span>${monthTitle(S.month)}</span>`;
+     arriba evita la pregunta «¿esto de cuándo es?» al volver de otra ventana.
+     Con el mismo mes, swap() no toca nada. */
+  swap(document.getElementById('titlebar-context'),
+    `${Icons.svg('calendar', 'ox-icon--sm')}<span>${monthTitle(S.month)}</span>`, { relevo: true });
+
+  // El pie del rail: antes se escribía una sola vez al arrancar y quedaba viejo.
+  const pie = document.getElementById('rail-foot');
+  if (pie) {
+    if (!pie.firstElementChild) pie.innerHTML = '<div class="ox-meta"></div>';
+    const n = S.moves.length;
+    frase(pie.firstElementChild, `${n} ${n === 1 ? 'movimiento guardado' : 'movimientos guardados'}`);
+  }
 }
 
 /** La marca late cuando algo se guardó: el movimiento ES el acuse de recibo,
@@ -107,17 +118,19 @@ function wireShell() {
   });
 
   /* Al recuperar el foco, releer del disco: una ventana que durmió en el tray
-     se pone al día sola en vez de mostrar su foto vieja de los datos. */
+     se pone al día sola en vez de mostrar su foto vieja de los datos. Solo si
+     algo cambió: antes se repintaba la vista entera en CADA vuelta del foco
+     —todo volvía a entrar y el cursor saltaba al monto— aunque los datos
+     fueran los mismos. */
   window.addEventListener('focus', async () => {
-    await refresh();
+    if (!await refresh()) return;
     Router.refresh();
     updateChrome();
   });
 
   // El "hace un rato" de la statusbar tiene que envejecer solo.
   setInterval(() => {
-    const saved = document.querySelector('#stat-saved .ox-statusbar__value');
-    if (saved && S.lastSaved) saved.textContent = relTime(S.lastSaved);
+    if (S.lastSaved) frase(document.querySelector('#stat-saved .ox-statusbar__value'), relTime(S.lastSaved));
   }, 30_000);
 }
 
@@ -157,9 +170,6 @@ async function boot() {
     console.error(err);
     return;
   }
-
-  document.getElementById('rail-foot').innerHTML =
-    `<div class="ox-meta">${S.moves.length} movimientos guardados</div>`;
 
   updateChrome();
   Router.onChange(updateChrome);

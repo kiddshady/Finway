@@ -1040,6 +1040,184 @@ app.whenReady().then(async () => {
   await js(`document.getElementById('aud-notr')?.remove()`);
 
 
+  /* ── 11-ter. El movimiento, medido ─────────────────────────────────────────
+     La auditoría de Finway contra Onyx (octubre 2026) encontró lo que cambiaba
+     de golpe: repintados en seco que hacían volver a entrar todo, la tabla que
+     se rehacía al filtrar, el formulario que se rehacía al editar, siete
+     animaciones que no animaban. Cada caso se muestrea en la página, cuadro por
+     cuadro: a ojo, a 60 fps, no se ve. */
+  console.log('\n11-bis. El movimiento, medido');
+
+  // `animation:` con el nombre de una CLASE (ox-in-fade) en vez del @keyframes
+  // (ox-fade-in) no anima nada y no avisa. Se recorren las reglas, no los
+  // elementos: así también cuenta lo que hoy no está en pantalla.
+  const huerfanas = await js(`(() => {
+    const existen = new Set();
+    const hojas = [...document.styleSheets].flatMap((h) => { try { return [[h, h.cssRules]]; } catch { return []; } });
+    const recorrer = (rs, fn) => { for (const r of rs) { fn(r); if (r.cssRules) recorrer(r.cssRules, fn); } };
+    for (const [, rs] of hojas) recorrer(rs, (r) => { if (r instanceof CSSKeyframesRule) existen.add(r.name); });
+    const CLAVES = new Set(['none', 'both', 'forwards', 'backwards', 'infinite', 'alternate', 'reverse',
+      'alternate-reverse', 'normal', 'running', 'paused', 'linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out',
+      'step-start', 'step-end', 'initial', 'inherit', 'unset', 'revert']);
+    const malas = [];
+    for (const [h, rs] of hojas) recorrer(rs, (r) => {
+      if (!r.style) return;
+      const v = r.style.getPropertyValue('animation-name') || r.style.getPropertyValue('animation');
+      v.replace(/[\\w-]+\\([^()]*(\\([^()]*\\)[^()]*)*\\)/g, ' ').split(/[\\s,]+/)
+        .filter((t) => /^-?[a-z_][\\w-]*$/i.test(t) && !CLAVES.has(t.toLowerCase()) && !existen.has(t))
+        .forEach((n) => malas.push((h.href || '').split('/').pop() + ' ' + r.selectorText + ' → ' + n));
+    });
+    return malas;
+  })()`);
+  ok('ninguna animación nombra un @keyframes que no existe', huerfanas.length === 0, huerfanas.join(' | '));
+
+  /* Repintar Resumen (cambiar de mes, guardar) es un fundido, y lo nuevo queda
+     asentado: el donut, las barras y las líneas no vuelven a entrar. */
+  await click('[data-view="resumen"]');
+  await sleep(900);
+  const repinte = await js(`(async () => {
+    const Router = (await import('./js/router.js')).default;
+    const view = document.getElementById('view');
+    Router.refresh();
+    const calco = document.querySelector('.ox-main--saliente');
+    await Promise.resolve();
+    const corriendo = view.getAnimations({ subtree: true }).filter((a) => !(a instanceof CSSTransition)
+      && a.playState === 'running' && a.effect?.target !== view
+      && a.effect?.getTiming().iterations !== Infinity).map((a) => a.animationName || a.effect?.target?.className?.baseVal || a.effect?.target?.className);
+    await new Promise((r) => setTimeout(r, 400));
+    return { calco: !!calco, corriendo, calcos: document.querySelectorAll('.ox-main--saliente').length };
+  })()`);
+  ok('repintar Resumen es un fundido (lo de antes en un calco)', repinte.calco && repinte.calcos === 0, JSON.stringify(repinte));
+  ok('y los gráficos no vuelven a entrar', repinte.corriendo.length === 0, JSON.stringify(repinte.corriendo));
+
+  /* Volver a la ventana con los mismos datos en disco no repinta nada. Antes
+     se repintaba la vista entera en cada vuelta del foco. */
+  const vuelta = await js(`(async () => {
+    const cabeza = document.querySelector('#view .ox-viewhead');
+    window.dispatchEvent(new Event('focus'));
+    await new Promise((r) => setTimeout(r, 600));
+    return { misma: document.querySelector('#view .ox-viewhead') === cabeza };
+  })()`);
+  ok('recuperar el foco sin cambios en disco no repinta la vista', vuelta.misma, JSON.stringify(vuelta));
+
+  await click('[data-view="movimientos"]');
+  await sleep(900);
+
+  /* Filtrar: fundido sobre la tabla, y las filas nuevas enteras desde el
+     primer cuadro. Antes: innerHTML del tbody y todas re-entrando escalonadas. */
+  const filtro = await js(`(async () => {
+    const caja = document.getElementById('mv-tabla');
+    if (!caja) return { sinCaja: true };
+    document.querySelector('#mv-filter [data-value="expense"]').click();
+    const calco = caja.querySelector(':scope > .ox-swap-out--fundido');
+    let minimo = 1; let vistas = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 300) {
+      for (const f of caja.querySelectorAll(':scope > table .ox-tr')) { vistas++; minimo = Math.min(minimo, +getComputedStyle(f).opacity); }
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    document.querySelector('#mv-filter [data-value="all"]').click();
+    await new Promise((r) => setTimeout(r, 400));
+    return { calco: !!calco, minimo, vistas };
+  })()`);
+  ok('filtrar la tabla es un fundido', filtro.calco, JSON.stringify(filtro));
+  ok('y las filas nuevas no vuelven a entrar', filtro.vistas > 0 && filtro.minimo === 1, JSON.stringify(filtro));
+
+  /* Editar: el formulario y la tabla son los MISMOS nodos; la fila se marca en
+     el lugar y el banner se despliega con su transición (antes nacía abierto). */
+  const edicion = await js(`(async () => {
+    const qa = document.getElementById('qa');
+    const fila = document.querySelector('#mv-rows .ox-tr');
+    const banner = document.getElementById('qa-banner');
+    fila.querySelector('[data-edit]').click();
+    await new Promise((r) => setTimeout(r, 60));
+    const r = { mismoForm: document.getElementById('qa') === qa,
+      mismaFila: document.querySelector('#mv-rows .ox-tr') === fila,
+      marcada: fila.classList.contains('is-editing'),
+      despliega: banner.getAnimations().some((a) => a.transitionProperty === 'grid-template-rows'),
+      dice: document.querySelector('.ox-inspector__head .ox-label').textContent };
+    document.getElementById('qa-cancel').click();
+    await new Promise((r) => setTimeout(r, 450));
+    r.desmarcada = !fila.classList.contains('is-editing');
+    r.cerrado = !banner.classList.contains('is-open');
+    return r;
+  })()`);
+  ok('editar no rehace el formulario ni la tabla', edicion.mismoForm && edicion.mismaFila && edicion.marcada, JSON.stringify(edicion));
+  ok('el banner de edición se despliega con su transición', edicion.despliega, JSON.stringify(edicion));
+  ok('y cancelar lo deja todo como estaba', edicion.desmarcada && edicion.cerrado, JSON.stringify(edicion));
+
+  /* El tipo: la cápsula existe (antes, sin bindSwitcher, quedaba en ancho 0) y
+     cambiar de tipo no rehace el formulario. */
+  const tipo = await js(`(async () => {
+    const qa = document.getElementById('qa');
+    const seg = document.getElementById('qa-type');
+    const ancho = () => parseFloat(getComputedStyle(seg, '::before').width);
+    const antes = ancho();
+    // Siempre la otra opción: la edición de arriba pudo dejar cualquiera de las dos.
+    const otra = seg.querySelector('.ox-segmented__opt:not(.is-active)');
+    const volver = seg.querySelector('.ox-segmented__opt.is-active');
+    otra.click();
+    await new Promise((r) => setTimeout(r, 450));
+    const r = { mismoForm: document.getElementById('qa') === qa, antes, despues: ancho(),
+      cambio: document.querySelector('#qa-type .ox-segmented__opt.is-active')?.dataset.value === otra.dataset.value,
+      cats: document.querySelectorAll('#qa-cats > .fw-cat-btn').length };
+    document.querySelector('#qa-type [data-value="' + volver.dataset.value + '"]').click();
+    await new Promise((r) => setTimeout(r, 450));
+    return r;
+  })()`);
+  ok('el segmentado del tipo tiene su cápsula', tipo.antes > 0 && tipo.despues > 0, JSON.stringify(tipo));
+  ok('y cambiar de tipo no rehace el formulario', tipo.cambio && tipo.mismoForm && tipo.cats > 0, JSON.stringify(tipo));
+
+  /* El calendario: cambiar de mes funde los días en su lugar, y el calco
+     conserva las 7 columnas (el de swap() no heredaba las de una grilla). */
+  const calendario = await js(`(async () => {
+    document.getElementById('qa-dp-field').click();
+    await new Promise((r) => setTimeout(r, 400));
+    const grid = document.querySelector('.fw-dp__grid');
+    document.querySelector('.fw-dp__pop [data-shift="1"]').click();
+    const calco = grid.querySelector(':scope > .ox-swap-out--fundido');
+    const columnas = calco ? getComputedStyle(calco).gridTemplateColumns.split(' ').length : 0;
+    await new Promise((r) => setTimeout(r, 400));
+    const r = { calco: !!calco, columnas, mismaGrilla: document.querySelector('.fw-dp__grid') === grid,
+      dias: grid.querySelectorAll(':scope > .fw-dp__day').length };
+    document.getElementById('qa-dp-field').click();
+    await new Promise((r) => setTimeout(r, 400));
+    return r;
+  })()`);
+  ok('cambiar de mes en el calendario funde los días en su lugar',
+    calendario.calco && calendario.mismaGrilla && calendario.dias === 42, JSON.stringify(calendario));
+  ok('y el calco conserva las 7 columnas de la grilla', calendario.columnas === 7, JSON.stringify(calendario));
+
+  /* Borrar una fila: se esfuma y las de abajo suben deslizándose. Antes se
+     rehacía la tabla entera (todas re-entraban) y lo de abajo saltaba. */
+  const borrado = await js(`(async () => {
+    const tbody = document.getElementById('mv-rows');
+    const filas = [...tbody.querySelectorAll(':scope > .ox-tr')];
+    if (filas.length < 2) return { saltea: filas.length };
+    const fila = filas[0];
+    fila.querySelector('[data-del]').click();
+    for (let i = 0; i < 50 && !document.querySelector('.ox-modal .ox-btn--danger-solid'); i++) await new Promise((r) => setTimeout(r, 20));
+    document.querySelector('.ox-modal .ox-btn--danger-solid').click();
+    let aMitad = null;
+    const t0 = performance.now();
+    while (fila.isConnected && performance.now() - t0 < 2000) {
+      const op = +getComputedStyle(fila).opacity;
+      if (op > 0.05 && op < 0.95) aMitad = op;
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    const desliza = filas.slice(1).some((f) => f.getAnimations().length > 0);
+    await new Promise((r) => setTimeout(r, 400));
+    return { aMitad, desliza, mismoTbody: document.getElementById('mv-rows') === tbody,
+      antes: filas.length, quedan: tbody.querySelectorAll(':scope > .ox-tr').length };
+  })()`);
+  if (borrado.saltea != null) console.log(`  --   borrado salteado (filas=${borrado.saltea})`);
+  else {
+    ok('borrar una fila la esfuma, sin rehacer la tabla',
+      borrado.aMitad != null && borrado.mismoTbody && borrado.quedan === borrado.antes - 1, JSON.stringify(borrado));
+    ok('y las de abajo suben deslizándose', borrado.desliza, JSON.stringify(borrado));
+  }
+  await sleep(500);
+
   console.log('\n12. La consola quedó limpia');
   ok('sin errores ni warnings del renderer', errores.length === 0, errores.slice(0, 6).join(' | '));
 

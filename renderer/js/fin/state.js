@@ -40,10 +40,13 @@ export async function loadAll() {
 }
 
 /** Relee del disco sin tocar nada más: al volver el foco, una ventana que
-    durmió en el tray se pone al día sola en vez de mostrar su foto vieja. */
+    durmió en el tray se pone al día sola en vez de mostrar su foto vieja.
+    Devuelve si algo cambió: si no, no hay nada que repintar. */
 export async function refresh() {
   const moves = await attempt(() => api.load(), { errorTitle: 'No se pudieron leer los movimientos' });
-  if (moves) S.moves = moves;
+  if (!moves || JSON.stringify(moves) === JSON.stringify(S.moves)) return false;
+  S.moves = moves;
+  return true;
 }
 
 export async function saveMove(move) {

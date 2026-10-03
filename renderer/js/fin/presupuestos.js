@@ -13,8 +13,9 @@
 
 import { Toast } from '../overlays.js';
 import Router from '../router.js';
-import { stagger } from '../motion.js';
+import { stagger, swap } from '../motion.js';
 import { esc, head, paint, viewEl } from '../ui.js';
+import { frase, numero } from './vivo.js';
 import { catColor, catLabel } from './categories.js';
 import { fmtARS, monthTitle, parseAmount } from './format.js';
 import { monthNavHTML, wireMonthNav } from './views.js';
@@ -130,15 +131,18 @@ const kpisHTML = (e) => {
   return ks.length ? ks.map(([k, ...r]) => kpi(k, ...r)).join('') : INTRO;
 };
 
+/* Cuando cambia CUÁLES hay (el primer tope, o borrar el último) es un relevo:
+   antes era un innerHTML y la intro y los KPIs se cambiaban de golpe. Con los
+   mismos, cada cifra destella en su lugar y cada frase hace relevo. */
 function actualizarKpis(box, e) {
   const ks = kpisDe(e);
-  const hay = [...box.querySelectorAll('[data-k]')].map((el) => el.dataset.k).join();
-  if (!ks.length || hay !== ks.map(([k]) => k).join()) { box.innerHTML = kpisHTML(e); return; }
+  const hay = [...box.querySelectorAll(':scope > [data-k]')].map((el) => el.dataset.k).join();
+  if (!ks.length || hay !== ks.map(([k]) => k).join()) { swap(box, kpisHTML(e), { relevo: true }); return; }
   for (const [k, label, value, { sub = '' }] of ks) {
-    const el = box.querySelector(`[data-k="${k}"]`);
-    el.querySelector('.ox-stat__label').textContent = label;
-    el.querySelector('.ox-stat__value').textContent = value;
-    el.querySelector('.fw-kpi__sub').textContent = sub;
+    const el = box.querySelector(`:scope > [data-k="${k}"]`);
+    frase(el.querySelector('.ox-stat__label'), label);
+    numero(el.querySelector('.ox-stat__value'), value);
+    frase(el.querySelector('.fw-kpi__sub'), sub);
   }
 }
 
@@ -215,10 +219,12 @@ function actualizar(root) {
     row.classList.toggle('is-warn', !!f.diaExceso);
     row.querySelector('.fw-budget__meter').classList.toggle('ox-meter--danger', f.excedido);
     row.querySelector('.ox-meter__fill').style.setProperty('--ox-pct', pctCSS(f));
-    row.querySelector('.fw-budget__text').textContent = detalleDe(f);
+    // En cada tecla: si cambian solo las cifras destella, si cambia la frase
+    // («quedan» → «te pasaste») hace relevo.
+    frase(row.querySelector('.fw-budget__text'), esc(detalleDe(f)));
   }
   actualizarKpis(root.querySelector('#bg-kpis'), e);
   const n = e.filas.filter((f) => f.tope != null).length;
-  const sub = root.querySelector('.ox-viewhead__sub');
-  if (sub) sub.textContent = n ? `${n} ${n === 1 ? 'categoría' : 'categorías'} con tope` : 'Sin topes todavía';
+  frase(root.querySelector('.ox-viewhead__sub'),
+    n ? `${n} ${n === 1 ? 'categoría' : 'categorías'} con tope` : 'Sin topes todavía');
 }

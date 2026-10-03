@@ -8,7 +8,9 @@
 import { Icons } from '../icons.js';
 import { Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
+import { swap } from '../motion.js';
 import { esc, head, paint, path as recortar, viewEl } from '../ui.js';
+import { frase } from './vivo.js';
 import { fmtARS } from './format.js';
 import { exportAll, importBackup, S } from './state.js';
 import { monthTotals } from './stats.js';
@@ -87,23 +89,34 @@ export function viewAjustes() {
   Router.onLeave(Update.onChange((e) => pintarUpdate(root, e)));
 }
 
+/* Con cada aviso del main (buscando → bajando 40 % → lista). El estado es una
+   frase: el porcentaje destella en su lugar y un cambio de fase hace relevo.
+   El botón NO se rehace en cada aviso —antes se reescribía hasta en cada % de
+   la descarga—: si es el mismo botón, solo se prende o se apaga; si cambia
+   (buscar → instalar), relevo. */
 function pintarUpdate(root, e) {
   const estado = root.querySelector('#aj-update-estado');
   const foot = root.querySelector('#aj-update-foot');
   if (!estado || !foot) return;
-  estado.textContent = Update.describir(e);
+  frase(estado, esc(Update.describir(e)));
 
   const ocupado = e.state === 'checking' || e.state === 'downloading';
-  foot.innerHTML = e.state === 'ready'
-    ? `<button class="ox-btn ox-btn--primary ox-flashable" id="aj-update-instalar">
-         <i data-icon="download"></i> Reiniciar e instalar la ${esc(e.version)}
-       </button>`
-    : `<button class="ox-btn ox-btn--secondary ox-flashable" id="aj-update-buscar"${ocupado || e.state === 'dev' ? ' disabled' : ''}>
-         <i data-icon="retry"></i> Buscar actualizaciones
-       </button>`;
-  Icons.mount(foot);
-  foot.querySelector('#aj-update-instalar')?.addEventListener('click', Update.instalar);
-  foot.querySelector('#aj-update-buscar')?.addEventListener('click', Update.buscar);
+  const boton = e.state === 'ready' ? `instalar:${e.version}` : 'buscar';
+  if (foot.dataset.boton !== boton) {
+    foot.dataset.boton = boton;
+    swap(foot, e.state === 'ready'
+      ? `<button class="ox-btn ox-btn--primary ox-flashable" id="aj-update-instalar">
+           <i data-icon="download"></i> Reiniciar e instalar la ${esc(e.version)}
+         </button>`
+      : `<button class="ox-btn ox-btn--secondary ox-flashable" id="aj-update-buscar">
+           <i data-icon="retry"></i> Buscar actualizaciones
+         </button>`, { relevo: true });
+    Icons.mount(foot);
+    foot.querySelector('#aj-update-instalar')?.addEventListener('click', Update.instalar);
+    foot.querySelector('#aj-update-buscar')?.addEventListener('click', Update.buscar);
+  }
+  const buscar = foot.querySelector('#aj-update-buscar');
+  if (buscar) buscar.disabled = ocupado || e.state === 'dev';
 }
 
 async function importar() {

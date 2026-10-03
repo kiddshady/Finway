@@ -18,6 +18,7 @@
 
 import { catColor, catLabel } from './categories.js';
 import { fmtARS, fmtCompact, monthShort } from './format.js';
+import { frase } from './vivo.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -101,7 +102,9 @@ export function trendHTML(trend, sel) {
     de mes o de rango. Todo lo que se engancha cuelga de nodos de la card, que
     mueren con el repintado. */
 export function wireTrend(root, trend, sel, onPick) {
-  const box = root.querySelector('.fw-trend');
+  // `root` puede ser la vista o la tendencia misma (al cambiar el rango se pasa
+  // la nueva: durante el fundido la vieja sigue adentro, en el calco).
+  const box = root?.matches?.('.fw-trend') ? root : root?.querySelector('.fw-trend');
   if (!box) return;
   const svg = box.querySelector('#trend-svg');
   const stage = box.querySelector('.fw-trend__stage');
@@ -135,7 +138,7 @@ export function wireTrend(root, trend, sel, onPick) {
       t.textContent = txt;
       t.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
     });
-    allBtn.textContent = allOn(trend, sel) ? 'Ninguna' : 'Todas';
+    frase(allBtn, allOn(trend, sel) ? 'Ninguna' : 'Todas');
     // Sin nada prendido la escala no mide nada: los números del eje se van.
     box.classList.toggle('is-none', !anyOn(trend, sel));
     none.classList.toggle('is-open', !anyOn(trend, sel));

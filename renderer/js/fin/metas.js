@@ -12,8 +12,9 @@
 import { Icons } from '../icons.js';
 import { Menu, Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
-import { exit, raf2, stagger } from '../motion.js';
+import { exit, raf2, stagger, swap } from '../motion.js';
 import { empty, esc, head, paint, viewEl } from '../ui.js';
+import { frase } from './vivo.js';
 import { currentMonth, dayLabel, fmtARS, monthTitle, parseAmount, shiftMonth, todayStr } from './format.js';
 import { ahorradoDe, estadoMeta } from './plan.js';
 import { monthTotals } from './stats.js';
@@ -223,25 +224,32 @@ export function viewMetas() {
   });
 }
 
-/** Repinta UNA tarjeta sin su animación de entrada, y hace viajar la barra
-    desde donde estaba: el cambio se ve, y las demás tarjetas ni se enteran. */
+/** Pone UNA tarjeta al día sin su animación de entrada: un fundido en el lugar
+    (lo viejo se esfuma encima de lo nuevo) y la barra viajando desde donde
+    estaba. Las demás tarjetas ni se enteran. Antes la tarjeta se reemplazaba
+    entera: la barra viajaba, pero el ahorrado, el %, «faltan», el plan y el
+    ícono cambiaban de golpe. */
 function repintarMeta(meta, { nuevos = [] } = {}) {
   const root = viewEl();
-  const vieja = root.querySelector(`[data-meta="${CSS.escape(meta.id)}"]`);
-  if (!vieja) { Router.refresh(); return; }
-  const antes = vieja.querySelector('.ox-meter__fill')?.style.getPropertyValue('--ox-pct');
-  vieja.insertAdjacentHTML('afterend', metaHTML(meta, { entrada: false, nuevos }));
-  const card = vieja.nextElementSibling;
-  vieja.remove();
+  const card = root.querySelector(`[data-meta="${CSS.escape(meta.id)}"]`);
+  if (!card) { Router.refresh(); return; }
+  // `:scope >`: durante un fundido anterior lo viejo sigue adentro, en el calco.
+  const fillDe = () => card.querySelector(':scope > .ox-card__body .ox-meter__fill');
+  const antes = fillDe()?.style.getPropertyValue('--ox-pct');
+  const molde = document.createElement('template');
+  molde.innerHTML = metaHTML(meta, { entrada: false, nuevos }).trim();
+  const nueva = molde.content.firstElementChild;
+  card.className = nueva.className;          // cumplida, vencida
+  card.classList.add('ox-swap-host');        // swap() la deja relativa para el calco
+  swap(card, nueva.innerHTML, { fundido: true });
   Icons.mount(card);
-  const fill = card.querySelector('.ox-meter__fill');
-  const despues = fill.style.getPropertyValue('--ox-pct');
-  if (antes && antes !== despues) {
+  const fill = fillDe();
+  const despues = fill?.style.getPropertyValue('--ox-pct');
+  if (fill && antes && antes !== despues) {
     fill.style.setProperty('--ox-pct', antes);
     raf2(() => fill.style.setProperty('--ox-pct', despues));
   }
-  const sub = root.querySelector('.ox-viewhead__sub');
-  if (sub) sub.textContent = subDe();
+  frase(root.querySelector('.ox-viewhead__sub'), esc(subDe()));
 }
 
 /* ── Formularios ─────────────────────────────────────────────────────────────
@@ -321,7 +329,8 @@ async function editarMeta(meta) {
   let fecha = meta?.fecha ?? null;
   const hoy = currentMonth();
   const pintarMes = () => {
-    body.querySelector('.fw-mesfield__valor').textContent = fecha ? monthTitle(fecha) : 'Sin fecha';
+    // Un mes por otro: relevo en el lugar (al abrir, con lo mismo, no hace nada).
+    frase(body.querySelector('.fw-mesfield__valor'), fecha ? monthTitle(fecha) : 'Sin fecha');
     body.querySelector('.fw-mesfield__valor').classList.toggle('is-empty', !fecha);
     body.querySelector('[data-mes="-1"]').disabled = !fecha || fecha <= hoy;
     body.querySelector('.fw-mesfield__quitar').classList.toggle('is-hidden', !fecha);
@@ -394,7 +403,8 @@ async function aportar(meta, signo) {
     const n = leerMontoCampo(monto);
     const pasado = retiro && n != null && n > ahorrado;
     monto.classList.toggle('is-invalid', pasado || monto.classList.contains('is-invalid'));
-    hint.textContent = pasado ? `No podés sacar más de ${fmtARS(ahorrado)}` : '';
+    // La pista aparece y se va esfumándose, no de golpe.
+    frase(hint, pasado ? `No podés sacar más de ${fmtARS(ahorrado)}` : '');
     hint.classList.toggle('ox-field__hint--error', pasado);
     return n != null && !pasado;
   });
@@ -452,8 +462,7 @@ async function borrarMeta(meta) {
   if (!await guardar()) { metas.splice(idx, 0, meta); return; }
   const root = viewEl();
   const card = root.querySelector(`[data-meta="${CSS.escape(meta.id)}"]`);
-  const sub = root.querySelector('.ox-viewhead__sub');
-  if (sub) sub.textContent = subDe();
+  frase(root.querySelector('.ox-viewhead__sub'), esc(subDe()));
   await exit(card, { fallback: 300 });
   if (!metas.length) Router.refresh();
   Toast.show({ title: 'Meta borrada', text: meta.nombre, icon: 'trash' });

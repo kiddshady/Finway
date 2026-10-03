@@ -83,7 +83,7 @@
   font-weight: var(--ox-w-semi);
   letter-spacing: var(--ox-track-tight);
   color: var(--ox-text);
-  animation: ox-in-fade var(--ox-t-3) var(--ox-ease) both;
+  animation: ox-fade-in var(--ox-t-3) var(--ox-ease) both;
 }
 .fw-monthnav__label .fw-year { color: var(--ox-text-3); font-weight: var(--ox-w-regular); }
 
@@ -125,7 +125,7 @@
 .fw-kpi__sub {
   font-size: var(--ox-fs-11);
   color: var(--ox-text-4);
-  animation: ox-in-fade var(--ox-t-3) var(--ox-ease) both;
+  animation: ox-fade-in var(--ox-t-3) var(--ox-ease) both;
 }
 
 /* ── Grilla de gráficos ─────────────────────────────────────────────────── */
@@ -164,7 +164,7 @@
   margin-top: var(--ox-2);
   font-size: var(--ox-fs-11);
   color: var(--ox-text-3);
-  animation: ox-in-fade var(--ox-t-2) var(--ox-ease-soft) both;
+  animation: ox-fade-in var(--ox-t-2) var(--ox-ease-soft) both;
 }
 .fw-readout__label {
   font-family: var(--ox-mono);
@@ -210,7 +210,7 @@
   align-items: center;
   gap: 1px;
   pointer-events: none;
-  animation: ox-in-fade var(--ox-t-2) var(--ox-ease-soft) both;
+  animation: ox-fade-in var(--ox-t-2) var(--ox-ease-soft) both;
 }
 .fw-donut__center-label {
   font-size: var(--ox-fs-10);
@@ -276,7 +276,7 @@
   stroke-dasharray: 3 4;
   stroke-linecap: round;
 }
-.fw-line__area { animation: ox-in-fade .8s var(--ox-ease) both }
+.fw-line__area { animation: ox-fade-in .8s var(--ox-ease) both }
 .fw-line__today { stroke: var(--ox-text-4); stroke-width: 1; stroke-dasharray: 2 4; opacity: .7 }
 .fw-line__tip { fill: var(--fw-line-c); animation: fw-tip-in .4s var(--ox-ease) .55s both }
 @keyframes fw-tip-in { from { r: 0; opacity: 0 } to { r: 4; opacity: 1 } }
@@ -348,7 +348,7 @@
 .fw-trend__pt {
   stroke: var(--ox-s2);
   stroke-width: 1.5;
-  animation: ox-in-fade .5s var(--ox-ease) .45s both;
+  animation: ox-fade-in .5s var(--ox-ease) .45s both;
   transition: cy .55s var(--ox-ease), r var(--ox-t-2) var(--ox-ease-soft);
 }
 .fw-trend__pt.is-hot { r: 5 }
@@ -584,7 +584,7 @@
   font-size: var(--ox-fs-12);
   color: var(--ox-text);
   text-transform: capitalize;
-  animation: ox-in-fade var(--ox-t-2) var(--ox-ease-soft) both;
+  animation: ox-fade-in var(--ox-t-2) var(--ox-ease-soft) both;
 }
 .fw-dp__dow, .fw-dp__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px }
 .fw-dp__dow span {

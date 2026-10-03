@@ -19,6 +19,7 @@ import Router from '../router.js';
 import { exit, stagger } from '../motion.js';
 import { esc, head, paint, viewEl } from '../ui.js';
 import { fmtARS, parseAmount } from './format.js';
+import { frase, numero } from './vivo.js';
 
 const DOC = 'calculadora';
 const FILAS_INICIALES = 3;
@@ -295,13 +296,16 @@ function actualizarCabeceras(root) {
   else delete nueva.dataset.tip;
 }
 
+/* En cada tecla. El total destella en su lugar; el pie, si cambian solo sus
+   cifras destella también, y si cambia la frase (aparece «sin entender») hace
+   relevo. Antes los dos eran un textContent en seco. */
 function actualizarTotal(card, calc) {
   const { total, contadas, invalidas } = sumar(calc.filas);
-  card.querySelector('.fw-calc__total').textContent = fmtARS(total);
+  numero(card.querySelector('.fw-calc__total'), fmtARS(total));
   const partes = [`${contadas} ${contadas === 1 ? 'monto' : 'montos'}`];
   if (invalidas) partes.push(`${invalidas} sin entender, no suman`);
   const detalle = card.querySelector('.fw-calc__detalle');
-  detalle.textContent = partes.join(' · ');
+  frase(detalle, partes.join(' · '));
   detalle.classList.toggle('fw-calc__detalle--error', invalidas > 0);
 }
 
