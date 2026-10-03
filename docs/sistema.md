@@ -153,6 +153,12 @@ banda no coma el primer ni el último ítem.
 
 `.ox-icon` con `--sm` / `--lg` / `--xl` / `--fill`.
 
+**Un ícono adentro de `.ox-meta` o `.ox-label` va en el renglón.** Los dos son
+texto en línea y todo `svg` es `display: block`, así que el ícono se iba solo a
+un renglón de arriba (salió de Pharos: «de la red», «Aplicar descuento» tenían
+el ícono flotando encima del texto). Con `:has(> .ox-icon)` pasan a
+`inline-flex` solo los que llevan ícono. El de humo lo mide (8-decies).
+
 ---
 
 ## Shell
@@ -283,6 +289,7 @@ Agregá `.ox-flashable` para el velo de luz al presionar. Se cablea solo con
 | `.ox-slider` | `<input type=range>` estilado; seteale `--ox-pct` |
 | `.ox-segmented` | La cápsula viaja. Cablealo con `bindSwitcher()` |
 | `.ox-kbd` | Una tecla |
+| `.ox-textarea` | Se estira hacia abajo, con un agarrador dibujado (`::-webkit-resizer`) y no el de Chromium |
 
 `bindSwitcher(el, onChange)` de `motion.js` sirve para `.ox-segmented` y
 `.ox-tabs`: maneja el activo, hace viajar el indicador y reajusta al
@@ -330,6 +337,8 @@ el SVG corrido más de medio píxel o desbordando.
 
 `.ox-list` + `.ox-listitem` con `__main` / `__title` / `__sub` / `__aside`.
 Las acciones van en `.ox-rowactions` (aparecen con el hover o con el foco de teclado; el clic no las deja pegadas).
+El anillo de foco de una `.ox-listitem` va hacia adentro: una lista suele ir de
+borde a borde de un `.ox-scroll`, y el de afuera se cortaba contra ese borde.
 
 `.ox-table` + `.ox-tr`; `.ox-td--num` alinea a la derecha con cifras tabulares,
 `.ox-td--tight` achica el padding. El `<th>` es sticky y por eso opaco: pinta
@@ -418,6 +427,9 @@ sus campos después de que cierre. Atrapa el foco y cierra con Escape.
 
 ```js
 exit(el, { fallback: 300 })    // saca del DOM DESPUÉS de la animación de salida
+swap(el, html, { relevo, fundido }) // reescribe un bloque sin cortes (ver abajo)
+calcar(host)                   // la vista que se va: calco opaco que se esfuma (lo usa el router)
+repintar(root, poner)          // repinta la misma vista con fundido y sin perder el lugar (lo usa paint)
 raf2(fn)                       // dos frames: los estilos iniciales ya se aplicaron
 stagger(container)             // escalona los hijos con --i
 initClickFlash(root)
@@ -433,12 +445,118 @@ tick(el)                       // destella un valor que acaba de cambiar
 `exit()` es el más importante y el que más se olvida: sin él, todo lo que se va
 del DOM parpadea.
 
+**`swap()` en vez de `innerHTML`** para todo bloque que cambia con la app
+andando. Un `innerHTML` a secas se lleva lo viejo en el mismo cuadro en que
+llega lo nuevo; `swap()` distingue cuatro casos:
+
+- **aparece** (vacío → algo): lo nuevo se funde;
+- **se va** (algo → vacío): cada hijo termina de irse antes de salir del DOM;
+- **cambian los valores** (algo → algo, sin `relevo`): se escribe en el lugar y
+  sin volver a animar — para lecturas que se recalculan seguido;
+- **un estado reemplaza a otro** (`{ relevo: true }`: pista → cargando →
+  resultado): lo viejo se esfuma en un calco encima, en el mismo lugar, y lo
+  nuevo asoma cuando lo viejo va por un tercio;
+- **un bloque grande cambia de forma** (`{ fundido: true }`: una tabla que gana
+  o pierde columnas): la espera del relevo lo dejaría entero a media luz, así
+  que el calco lleva el fondo opaco de lo que tiene detrás, va por encima del
+  `th` sticky de la tabla nueva, y lo nuevo está entero y quieto debajo desde
+  el primer cuadro.
+
+En el relevo y en el fundido el calco conserva la caja que tenía lo viejo
+(ancho, alto y dónde caía), no la del contenedor ya con lo nuevo: con
+`inset: 0`, una frase que se iba dentro de una caja más angosta se partía en
+dos renglones. La caja se mide **con decimales** (`getBoundingClientRect`, no
+`clientWidth`, que redondea: a una frase de 105,06 px le daba 105 y se partía
+igual), y el calco copia el acomodo del contenedor, sea flex o **grilla** (sus
+columnas también: sin ellas, una grilla de 7 caía a una columna durante el
+fundido). Los textos sueltos se envuelven en un `<span>` para que también
+entren —y se vayan— animados. Viene de Pharos 0.4.1 y de Finway.
+
+Con el mismo HTML de la última vez no hace nada, así que se puede llamar en cada
+refresco. Si lo de antes todavía estaba entrando, lo nuevo sigue desde el mismo
+punto del fundido. Mientras dura un relevo el contenido viejo sigue en el DOM
+adentro de `.ox-swap-out--over`, sin ids: buscá lo nuevo con `:scope > …`, no
+con un `querySelector` suelto que puede agarrar lo que se está yendo. Lo muestra
+la vitrina en «Reescribir un bloque» y lo mide el humo (8-undecies, que
+también mide la caja del calco y el fundido de una tabla).
+
 ### Clases de animación
 
 Entradas: `.ox-in-fade` · `.ox-in-rise` · `.ox-in-glide` · `.ox-in-pop`.
 Estado: `.ox-spinning` · `.ox-breathing` · `.ox-shaking` · `.ox-skeleton` ·
 `.ox-ticked`. `.ox-view` es la transición de vista (la aplica el router).
 `.ox-reveal` con `.is-open` para el alto.
+
+**Lo que se prende con `hidden` se pliega.** `.ox-plegable` (alto) y
+`.ox-plegable--ancho` (ancho, en una fila) hacen que `el.hidden = …` no sea un
+corte: se pliega hasta 0 mientras se desvanece y recién al final pasa a
+`display: none`, con `@starting-style`, `interpolate-size` y `display`
+`allow-discrete`. El JS no cambia. `.ox-reveal` sigue siendo para cuando
+manejás una clase y tenés un envoltorio. En una fila, declarale a la fila su
+`gap` en `--ox-plegable-gap` (la statusbar ya lo trae): si no, los de al lado
+saltan cuando el plegado pasa a `display: none`. Si lo de abajo reacciona al
+tamaño (un ResizeObserver que redibuja), que espere a que termine el pliegue.
+Lo muestra la vitrina en «Mostrar y esconder» y lo mide el humo (8-duodecies).
+
+**El cambio de vista es un fundido.** Al navegar, el router pasa el contenido
+de la vista vieja a un calco (`.ox-main--saliente`: misma clase, sin ids, inerte
+y con su scroll) en la misma celda de `.ox-body`, encima, y lo esfuma
+(`--ox-t-2`, in-out). La nueva no anima nada: ya está entera y quieta debajo, y
+como el calco es opaco (el fondo de `.ox-main`) la pantalla está tapada en todo
+momento. `.ox-view` (el glide) queda para el arranque, cuando no hay nada que
+relevar. El de humo mide cuánto está tapada la pantalla cada 40 ms (9-ter).
+
+**Repintar la misma vista también es un fundido, y no pierde el lugar.**
+`Router.refresh()` (después de guardar, duplicar, borrar) o una vista que se
+vuelve a pintar con el dato nuevo pasan por `paint()`, y `paint()` repinta con
+`repintar()` (motion.js): el mismo calco que al navegar, y lo nuevo **asentado**
+debajo. Antes era un `innerHTML` en seco y se veían cuatro cosas en todas las
+apps (la auditoría de Finway y Apex de octubre de 2026):
+
+- lo viejo se iba en el mismo cuadro en que llegaba lo nuevo;
+- todo lo que tiene entrada propia volvía a entrar —las filas escalonadas, el
+  vacío que sube, la línea de un gráfico que se dibuja— y ahora se da por
+  terminado (lo infinito, como un spinner, sigue; las transiciones también);
+- `countTo()` volvía a contar desde 0, y ahora escribe el valor (si cambió, el
+  fundido lo muestra);
+- el lugar se perdía. Ahora se saca una foto antes de pintar (el `remontar()`
+  de Apex): los revelados abiertos y las cápsulas se devuelven apenas se
+  pinta, para que la vista los vea al cablearse, y el scroll y el foco cuando
+  terminó de cablearse. Todo se reconoce por **id**: un `.ox-reveal` o un
+  segmentado sin id no se recuerda; el scroll va por orden de los `.ox-scroll`.
+
+Lo nuevo se asienta dos veces: al pintar, y al terminar la tarea con lo que la
+vista haya arrancado al cablearse. Lo que una vista arranque después de un
+`await` ya no cuenta como repintado y entra normal. Si la vista se calcó hace
+menos de 60 ms (navegó y pintó «cargando» y enseguida el dato), lo nuevo va
+directo debajo de ese calco, sin otro en el medio. Lo mide el humo (9-quater).
+
+De paso: la cápsula de un segmentado y el subrayado de los tabs **nacen en su
+lugar** (`colocar()`, de Apex). Antes la primera medida llegaba en `raf2` y la
+cápsula nacía en ancho 0 contra la izquierda y crecía, en cada vista montada.
+
+Hubo dos versiones antes. En la primera la vieja se iba de un cuadro al otro y
+la nueva arrancaba desde transparente: un cuadro vacío. En la segunda la nueva
+esperaba 90 ms invisible y entraba con el glide —la receta de `swap()`, que es
+para bloques chicos sobre el mismo fondo—. Con vistas enteras la pantalla bajaba
+a un tercio de tapada y volvía: en Quire, con las hojas blancas de un PDF, el
+brillo medido iba 207 → 36 → 50, más oscuro que las dos vistas, y el título y
+las barras que las dos tienen en el mismo lugar se veían temblar al correrse.
+
+Consecuencia para las apps: durante el fundido hay un segundo `.ox-main` en el
+DOM, así que buscá por id o dentro de `#view`, no con un
+`document.querySelector('.ox-main …')` suelto.
+
+Dos cosas más del calco, que salieron de Chem Engine:
+
+- **Mover un nodo le reinicia las animaciones CSS.** El router da por terminadas
+  las entradas de lo que pasa al calco (las infinitas, como un spinner, siguen);
+  sin eso, un bloque con fundido propio caía a 0 y volvía a entrar mientras la
+  vista se esfumaba.
+- **La limpieza de la vista (`onLeave`) corre ANTES del relevo.** Lo que se
+  suelte ahí se ve suelto durante esos 160 ms. Un canvas WebGL al que se le
+  fuerza la pérdida del contexto se pinta **blanco**: soltalo con un
+  `setTimeout` más largo que la salida, no en el acto.
 
 ---
 
@@ -451,7 +569,7 @@ Router.define({
 }, document.getElementById('view'));
 
 Router.go('item', 'n-0003');
-Router.refresh();                 // remonta la actual
+Router.refresh();                 // remonta la actual: fundido, sin perder el lugar
 Router.onLeave(store.onEvent(f)); // limpieza de la vista que se está montando
 Router.onChange((a, desde) => {});
 Router.current / .name / .param
@@ -466,7 +584,7 @@ degrada sola.
 ## Helpers de vista
 
 ```js
-paint(html)                        // innerHTML + monta íconos + cablea fades
+paint(html)                        // pinta + monta íconos + cablea fades; repintar la misma vista es un fundido
 head({ title, sub, crumbs, actions, linea })
 empty({ icon, title, text, actions })
 esc(str)                           // TODO dato de afuera pasa por acá

@@ -10,6 +10,8 @@
    la app se degrada sola después de un rato de uso.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+import { calcar } from './motion.js';
+
 const routes = new Map();
 const listeners = new Set();
 
@@ -72,21 +74,44 @@ export function go(name, param = null) {
   document.querySelectorAll('.ox-navitem').forEach((b) =>
     b.classList.toggle('is-active', b.dataset.view === navKey));
 
+  // La vista que se va pasa a un calco que se esfuma encima (calcar, en
+  // motion.js): sin esto se iba de golpe y la nueva arrancaba desde
+  // transparente, un cuadro vacío en cada navegación.
+  const saliente = calcar(host);
   route.view(param);
 
-  // La transición de vista se reinicia a mano: sin el reflow intermedio el
-  // navegador no vuelve a disparar la animación al re-agregar la clase.
-  if (host) {
-    host.classList.remove('ox-view');
+  // Si hay una vista yéndose, la nueva no anima nada: ya está entera y quieta
+  // debajo del calco, que es opaco, y el relevo lo hace el calco al
+  // esfumarse. Antes la nueva esperaba 90 ms invisible y entraba corrida
+  // 10 px: la pantalla se destapaba hasta la mitad y volvía (con contenido
+  // claro, un parpadeo) y lo que las dos vistas tienen en el mismo lugar —el
+  // título, las barras— temblaba. Medido en Quire (0.9.5).
+  //
+  // Sin vista yéndose (el arranque) entra sobre el eje del flujo. La
+  // transición se reinicia a mano: sin el reflow intermedio el navegador no
+  // vuelve a disparar la animación al re-agregar la clase.
+  if (host) host.classList.remove('ox-view', 'is-settled');
+  if (host && !saliente) {
     void host.offsetWidth;
     host.classList.add('ox-view');
+    // Terminada la entrada, se apaga con una clase: una animación con fill
+    // `both` deja su último cuadro aplicado para siempre, y una opacidad
+    // retenida vuelve a la vista frontera de backdrop para lo que tenga adentro.
+    const settle = (ev) => {
+      if (ev.target !== host || ev.animationName !== 'ox-glide-in') return;
+      host.removeEventListener('animationend', settle);
+      host.classList.add('is-settled');
+    };
+    host.addEventListener('animationend', settle);
   }
 
   listeners.forEach((fn) => fn({ ...current }, from));
   return true;
 }
 
-/** Vuelve a montar la vista actual (después de un cambio de datos de fondo). */
+/** Vuelve a montar la vista actual (después de un cambio de datos de fondo).
+ *  Es un fundido que no pierde el lugar —scroll, foco, revelados, cápsulas—
+ *  y no vuelve a hacer entrar nada: lo hace paint() (repintar, en motion.js). */
 export function refresh() {
   const route = routes.get(current.name);
   if (!route) return;
