@@ -14,10 +14,20 @@ export function raf2(fn) {
  * Saca un elemento del DOM DESPUÉS de su animación de salida.
  * Marca data-state="closing" (el CSS engancha ahí) y espera al animationend,
  * con un timeout de red por si el elemento no tiene animación declarada.
+ *
+ * Lo que se está yendo se puede REVIVIR: sacarle `data-state` antes de que
+ * termine lo deja en el DOM (y `onDone` no corre). Hace falta cuando vuelve
+ * a hacer falta a mitad de su salida: el velo de un modal que se cierra y
+ * otro que abre enseguida (dos velos encimados oscurecían la pantalla), el
+ * número de un contador que vuelve mientras se iba (cortar la salida y entrar
+ * de nuevo desde 0 era un parpadeo). Si después vuelve a salir, esa salida es
+ * otra: la vieja no lo saca antes de tiempo.
  */
 export function exit(el, { fallback = 400, onDone } = {}) {
   if (!el || el.dataset.state === 'closing') return Promise.resolve();
   el.dataset.state = 'closing';
+  const salida = {};
+  el.__salida = salida;
 
   return new Promise((resolve) => {
     let done = false;
@@ -26,8 +36,8 @@ export function exit(el, { fallback = 400, onDone } = {}) {
       done = true;
       clearTimeout(timer);
       el.removeEventListener('animationend', onAnim);
-      el.remove();
-      onDone?.();
+      const sigueYendose = el.__salida === salida && el.dataset.state === 'closing';
+      if (sigueYendose) { el.remove(); onDone?.(); }
       resolve();
     };
     // Solo nos importa la animación del propio elemento, no la de sus hijos.
@@ -97,8 +107,25 @@ export function swap(el, html, { relevo = false, fundido = false } = {}) {
     return;
   }
 
+  // Lo que todavía estaba ENTRANDO no se da por terminado. finish() lo llevaba
+  // a opaco y el calco lo esfumaba desde ahí: dos relevos seguidos («Buscando…»
+  // y el resultado a los 30 ms) mostraban entero, un instante, un estado que
+  // nunca se había visto. Lo que no había asomado se va sin calco; lo que iba a
+  // mitad de camino sale desde la opacidad que tenía. Salió de Quire (el cartel
+  // de actualización ya lo hacía así).
+  const aMitad = new Map();
+  for (const n of viejos) {
+    if (n.nodeType !== 1 || !n.classList.contains('ox-swap-in') || n.classList.contains('is-settled')) continue;
+    const op = +getComputedStyle(n).opacity;
+    if (op < 0.02) n.remove(); else aMitad.set(n, op);
+  }
+  const vivos = viejos.filter((n) => n.isConnected);
+  const quedan = vivos.some((n) => n.nodeType === 1 || n.textContent.trim());
+  // Si algo de antes se sigue yendo, lo nuevo igual espera su turno.
+  const yendose = !!el.querySelector(':scope > .ox-swap-out');
+
   if (antes && !despues) {
-    for (let n of viejos) {
+    for (let n of vivos) {
       // Un texto suelto no puede salir animado: se borraba de golpe. Va en un
       // <span> y sale como los demás.
       if (n.nodeType === 3 && n.textContent.trim()) {
@@ -108,6 +135,9 @@ export function swap(el, html, { relevo = false, fundido = false } = {}) {
         n = s;
       }
       if (n.nodeType !== 1) { n.remove(); continue; }
+      // La salida no tiene `from`: parte de la opacidad de abajo, que sin esto
+      // sería 1 aunque lo estuviera agarrando a mitad de su entrada.
+      if (aMitad.has(n)) n.style.opacity = String(aMitad.get(n));
       n.classList.remove('ox-swap-in', 'is-after');
       n.classList.add('ox-swap-out');
       n.inert = true;
@@ -118,13 +148,13 @@ export function swap(el, html, { relevo = false, fundido = false } = {}) {
 
   let calco = null;
   let caja = null;
-  if (antes) {
+  if (quedan) {
     caja = cajaDe(el);
     calco = document.createElement('div');
     calco.className = `ox-swap-out ox-swap-out--over${fundido ? ' ox-swap-out--fundido' : ''}`;
     calco.inert = true;
     calco.setAttribute('aria-hidden', 'true');
-    calco.append(...viejos);
+    calco.append(...vivos);
     for (const x of calco.querySelectorAll('[id]')) x.removeAttribute('id');
     if (getComputedStyle(el).position === 'static') el.classList.add('ox-swap-host');
     // El fondo, del primer opaco hacia arriba: el calco no lleva la clase de
@@ -132,10 +162,15 @@ export function swap(el, html, { relevo = false, fundido = false } = {}) {
     if (fundido) calco.style.background = fondoDetras(el);
     el.prepend(calco);
     // Mover un nodo le reinicia las animaciones CSS: lo que tenía su propia
-    // entrada volvería a entrar desde cero adentro del calco que se va.
+    // entrada volvería a entrar desde cero adentro del calco que se va. Se da
+    // por terminada, salvo la de lo que venía entrando: esa se cancela (una
+    // de CSS cancelada no vuelve mientras no cambie su nombre) y queda en la
+    // opacidad en que se la agarró.
     for (const a of calco.getAnimations({ subtree: true })) {
-      if (a.effect?.getTiming().iterations !== Infinity) a.finish();
+      if (aMitad.has(a.effect?.target)) a.cancel();
+      else if (a.effect?.getTiming().iterations !== Infinity) a.finish();
     }
+    for (const [n, op] of aMitad) n.style.opacity = String(op);
     exit(calco, { fallback: 220 });
   }
 
@@ -150,7 +185,7 @@ export function swap(el, html, { relevo = false, fundido = false } = {}) {
     s.append(n);
   }
   // Con fundido lo nuevo no anima: está entero debajo y el calco lo destapa.
-  if (!(fundido && antes)) for (const n of tpl.content.children) entrar(n, antes);
+  if (!(fundido && calco)) for (const n of tpl.content.children) entrar(n, quedan || yendose);
   el.append(tpl.content);
 
   // El calco, clavado en la caja vieja: medida ya con lo nuevo adentro.
@@ -374,8 +409,11 @@ export function bindSwitcher(root, onChange) {
  * El calco va sin ids (nadie tiene que encontrar un #campo que se está yendo),
  * inerte, y conserva su scroll. Si la vista vieja todavía estaba entrando, el
  * calco arranca desde la opacidad y el corrimiento en que la agarró. Si ya
- * había otro calco yéndose, el nuevo va encima de ese: es el estado más
- * reciente.
+ * había otro calco yéndose, el nuevo va DEBAJO de ese, pegado a la vista: así
+ * el cuadro siguiente es la misma composición que el anterior (lo que se iba
+ * sigue a su opacidad, encima de lo que acaba de calcarse). Encima de todos,
+ * el calco nuevo —opaco— tapaba de golpe lo que se iba: medido, lo que se veía
+ * al 79 % pasaba a 0 % de un cuadro al otro. Quire lo tenía así.
  */
 export function calcar(host) {
   if (!host || !host.firstChild || !host.parentElement) return null;
@@ -394,9 +432,7 @@ export function calcar(host) {
     .map((el) => [el, el.scrollTop, el.scrollLeft]);
   calco.append(...host.childNodes);
   for (const el of calco.querySelectorAll('[id]')) el.removeAttribute('id');
-  let ancla = host;
-  while (ancla.nextElementSibling?.classList.contains('ox-main--saliente')) ancla = ancla.nextElementSibling;
-  ancla.after(calco);
+  host.after(calco);
   for (const [el, top, left] of scrolls) { el.scrollTop = top; el.scrollLeft = left; }
 
   // Mover un nodo en el DOM le REINICIA las animaciones CSS. Lo que tenía su
@@ -411,7 +447,34 @@ export function calcar(host) {
 
   exit(calco, { fallback: 260 });
   host.__calcadoEn = performance.now();
+  // Hasta el cuadro siguiente, lo que se ponga en host no se pintó nunca (ver
+  // recienCalcado). El tope es por si la ventana no está pintando.
+  const marca = host.__sinPintar = {};
+  const pintado = () => { if (host.__sinPintar === marca) host.__sinPintar = null; };
+  requestAnimationFrame(pintado);
+  setTimeout(pintado, 100);
   return calco;
+}
+
+/**
+ * Si lo que hay en `host` es un estado intermedio que el calco —todavía casi
+ * opaco— no dejó ver: otro calco encima lo mostraría. Lo miran repintar() y
+ * el router: el que llega en ese rato va directo debajo del calco que ya está.
+ *
+ * Es «todavía no hubo un cuadro desde el calco» o «hace menos de 60 ms». Con
+ * el reloj solo, un refresh() que tardaba (un innerHTML grande, armar
+ * miniaturas, otros oyentes del aviso) se pasaba de los 60 ms antes del go()
+ * de la MISMA tarea, que volvía a calcar: dos calcos, y el intermedio
+ * asomando, justo con los documentos grandes (en la sonda, 80 ms de trabajo).
+ * En la misma tarea no se pinta nada, así que eso se decide por cuadros. Con
+ * la ventana oculta no hay cuadros y la marca dura hasta el tope (que en
+ * segundo plano Chromium estira a un segundo): ahí vale solo el reloj, o un
+ * segundo refresco con la ventana minimizada se quedaría sin foto del lugar.
+ */
+export function recienCalcado(host) {
+  if (!host) return false;
+  if (host.__sinPintar && document.visibilityState === 'visible') return true;
+  return performance.now() - (host.__calcadoEn ?? -Infinity) < 60;
 }
 
 const INDICADORES = [
@@ -419,8 +482,11 @@ const INDICADORES = [
   { sel: '.ox-tabs', pseudo: '::after', x: '--tab-x', w: '--tab-w' },
 ];
 
-/** Mientras se asienta un repintado, countTo() no cuenta: escribe el valor. */
-let asentando = 0;
+/** Mientras se asienta un repintado, countTo() no cuenta: escribe el valor.
+    Cada uno con la pintada que asienta: si go() ya puso otra vista encima
+    (ver asentar), la nueva cuenta como siempre. */
+const asentando = new Set();
+const asentandoAlgo = () => [...asentando].some((a) => a.root.__pinta === a.pinta);
 
 /** El lugar de una vista, antes de repintarla. Se reconoce por ids. */
 function fotografiar(root) {
@@ -469,8 +535,7 @@ function devolverAlPintar(root, f) {
  * —encabezado sin cuerpo— y la pantalla bajaba de brillo (Pharos).
  */
 export function repintar(root, poner) {
-  const recien = performance.now() - (root.__calcadoEn ?? -Infinity) < 60;
-  const f = !recien && root.firstChild ? fotografiar(root) : null;
+  const f = !recienCalcado(root) && root.firstChild ? fotografiar(root) : null;
   const calco = f ? calcar(root) : null;
   poner();
   if (!calco) return false;
@@ -481,21 +546,40 @@ export function repintar(root, poner) {
 
 /* Lo nuevo queda quieto debajo del calco: sus entradas se dan por terminadas
    (lo que gira para siempre sigue, y las transiciones también: una cápsula
-   que viene de donde estaba tiene que llegar viajando). Se hace dos veces:
-   ahora, con lo que trajo el HTML, y al terminar la tarea, con lo que la vista
-   haya arrancado al cablearse. Recién ahí se devuelven el scroll y el foco,
-   que dependen del alto final. */
+   que viene de donde estaba tiene que llegar viajando). La excepción son los
+   plegables: un .ox-plegable que nace visible se despliega desde 0 con una
+   TRANSICIÓN (@starting-style), así que también hay que asentarlo, o crece
+   debajo del fundido (asentarPlegables, abajo). Se hace dos veces: ahora,
+   con lo que trajo el HTML, y al terminar la tarea, con lo que la vista haya
+   arrancado al cablearse. Recién ahí se devuelven el scroll y el foco, que
+   dependen del alto final. */
 function asentar(root, f) {
   const terminar = () => {
+    asentarPlegables(root);
     for (const a of root.getAnimations({ subtree: true })) {
-      if (a.effect?.target === root || a instanceof CSSTransition) continue;
+      if (a.effect?.target === root) continue;
+      if (a instanceof CSSTransition) {
+        // El que ya había arrancado (algo forzó el estilo antes, como colocar
+        // una cápsula), se termina. El de un pseudo no es un plegable.
+        if (!a.effect?.pseudoElement && a.effect?.target?.matches?.(PLEGABLE)) a.finish();
+        continue;
+      }
       if (a.effect?.getTiming().iterations !== Infinity) a.finish();
     }
   };
-  asentando++;
+  /* `__pinta` cuenta las vistas que pasaron por root, y go() lo sube. Un
+     refresh() y un go() en la misma tarea (shell-29) dejaban este pendiente
+     corriendo sobre la vista NUEVA: le ponía a sus .ox-scroll el scroll de
+     la vieja (en la sonda, B nacía en 0 y saltaba a 700), podía enfocar algo
+     suyo por un id que coincidiera, le daba por terminadas sus entradas y sus
+     countTo() escribían el valor en vez de contar. Pasaba también antes, con
+     el calco doble. Si la vista ya es otra, no se toca nada. */
+  const yo = { root, pinta: root.__pinta };
+  asentando.add(yo);
   terminar();
   queueMicrotask(() => {
-    asentando--;
+    asentando.delete(yo);
+    if (root.__pinta !== yo.pinta) return;
     terminar();
     const scrolls = root.querySelectorAll('.ox-scroll');
     f.scrolls.forEach((top, i) => { if (scrolls[i] && top) scrolls[i].scrollTop = top; });
@@ -508,6 +592,32 @@ function asentar(root, f) {
       el?.focus({ preventScroll: true });
     }
   });
+}
+
+const PLEGABLE = '.ox-plegable, .ox-plegable--ancho';
+
+/**
+ * Pone en su lugar, sin desplegarse, los plegables visibles de `root`: les
+ * apaga la transición (`.is-placing`), fuerza el estilo y se la devuelve.
+ * Si todavía no tenían estilo, nacen ya abiertos (@starting-style no tiene
+ * con qué transicionar); si ya venían desplegándose, sacarles la transición
+ * los corta en su alto final. Uno que se prende DESPUÉS con `hidden = false`
+ * se despliega como siempre.
+ *
+ * Lo llama solo repintar(). Una vista que se monta navegando y no quiere que
+ * los suyos crezcan debajo del calco (la barra de tinta de Quire, que nace
+ * visible si la tinta estaba prendida) lo llama después de pintar. Es lo que
+ * hace colocar() con las cápsulas, para los plegables. De css-13 (Quire).
+ */
+export function asentarPlegables(root) {
+  if (!root) return;
+  const sel = '.ox-plegable:not([hidden]), .ox-plegable--ancho:not([hidden])';
+  const todos = [...root.querySelectorAll(sel)];
+  if (root.matches?.(sel)) todos.unshift(root);
+  if (!todos.length) return;
+  for (const el of todos) el.classList.add('is-placing');
+  for (const el of todos) void getComputedStyle(el).height;
+  for (const el of todos) el.classList.remove('is-placing');
 }
 
 /* ── Campo numérico ─────────────────────────────────────────────────────────
@@ -556,6 +666,11 @@ export function bindStepper(root, onChange) {
   };
 
   function mover(dir) {
+    /* Si el input ya se fue del documento, el listener del paso anterior repintó
+       el panel entero y este quedó huérfano: su número no lo ve nadie, pero cada
+       paso sigue despachando 'change' y volviendo a repintar. Acá se corta. */
+    if (!input.isConnected) return false;
+
     const antes = leer();
     const v = acotar(antes + dir * num('step', 1));
     if (v === antes) { sync(); return false; }
@@ -569,7 +684,12 @@ export function bindStepper(root, onChange) {
   }
 
   let timer = null;
-  const frenar = () => { clearTimeout(timer); timer = null; };
+  function frenar() {
+    clearTimeout(timer);
+    timer = null;
+    window.removeEventListener('pointerup', frenar);
+    window.removeEventListener('pointercancel', frenar);
+  }
 
   function arrancar(dir, desde) {
     const transcurrido = Date.now() - desde;
@@ -581,22 +701,38 @@ export function bindStepper(root, onChange) {
     const btn = e.target.closest('[data-step]');
     if (!btn || btn.disabled) return;
     e.preventDefault();                 // que el campo no pierda el foco
+    frenar();                           // nunca dos repeticiones sobre el mismo campo
     const dir = btn.dataset.step === 'up' ? 1 : -1;
+
+    /* Soltar tiene que frenar SIEMPRE, y el pointerup no siempre llega hasta acá:
+       si el primer paso hace que quien escucha repinte, este root sale del
+       documento y el evento cae sobre los nodos nuevos. window sí lo ve. Se
+       enganchan al apretar y los suelta frenar(), así no se acumulan. */
+    window.addEventListener('pointerup', frenar);
+    window.addEventListener('pointercancel', frenar);
+
     mover(dir);
     const desde = Date.now();
     timer = setTimeout(() => arrancar(dir, desde), ESPERA);
-    /* La captura del puntero es lo que hace que soltar CUENTE aunque el dedo se
-       haya ido del botón. Sin esto, arrastrar afuera deja el contador corriendo
-       para siempre. */
-    btn.setPointerCapture?.(e.pointerId);
+    /* La captura del puntero mantiene el aguante aunque el dedo se salga del
+       botón. Si el paso de recién ya se llevó puesto el botón, tirar acá no
+       importa: el freno de verdad está en window. */
+    try { btn.setPointerCapture(e.pointerId); } catch { /* ya no está en el DOM */ }
   });
 
-  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    root.addEventListener(ev, frenar);
-  }
-
   input.addEventListener('input', sync);
+
+  /* La primera vez, sin transición: una flecha que NACE en el tope ya está
+     apagada, no se apaga. Con la opacidad en la transición (U4), si algo
+     había forzado el estilo entre el paint() y este cableado, la flecha de
+     abajo de un campo en 0 se fundía en cada montaje: 100 100 76 58 44 35 30
+     27 25, al navegar y al repintar (debajo del fundido, que asentar() no
+     corta porque solo termina los plegables). Lo de colocar() con las
+     cápsulas: una clase que la apaga, forzar el estilo, sacarla. */
+  root.classList.add('is-placing');
   sync();
+  for (const b of root.querySelectorAll('[data-step]')) void getComputedStyle(b).opacity;
+  root.classList.remove('is-placing');
   return sync;
 }
 
@@ -613,7 +749,7 @@ export function countTo(el, to, { from = 0, duration = 700, format = (n) => n } 
   // Repintando la misma vista, el número ya estaba en pantalla: volver a
   // contar desde 0 lo haría entrar de nuevo. Va el valor; si cambió, el
   // fundido del repintado lo muestra.
-  if (asentando) { el.textContent = format(Math.round(to)); return; }
+  if (asentandoAlgo()) { el.textContent = format(Math.round(to)); return; }
   const start = performance.now();
   const ease = (t) => 1 - Math.pow(1 - t, 3);
   const tick = (now) => {
@@ -642,12 +778,16 @@ export function tick(el) {
      valor(el, html)             algo que cambia MUY seguido (las flechas de un
                                  stepper apretadas): siempre en su lugar
      deslizarAlto(el, cambio)    la caja va de su alto al nuevo, no salta
+     deslizarAncho(el, cambio)   lo mismo a lo ancho (un ítem de una fila)
+     ocupar(btn, ocupado, html)  un botón libre ↔ ocupado: relevo y el ancho viaja
+     contador(el, n)             un contador que aparece, cambia y se va
      reconcile(box, items)       una lista que se pone al día por clave */
 
 /* Los tokens de motion.css, para lo que se anima desde JS. */
-const T = { in: 280, out: 150, move: 280, size: 180, after: 80, step: 14 };
+const T = { in: 280, out: 150, move: 280, size: 180, after: 80, step: 14, pliegue: 100 };
 const EASE = 'cubic-bezier(.16, 1, .3, 1)';         // --ox-ease
 const EASE_BOTH = 'cubic-bezier(.65, 0, .35, 1)';   // --ox-ease-both
+const EASE_SOFT = 'cubic-bezier(.33, 1, .68, 1)';   // --ox-ease-soft
 
 const reducido = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -715,13 +855,50 @@ export function valor(el, html) {
   tick(el);
 }
 
+/* ¿Hay un relevo yéndose adentro de la caja? Es el calco de swap() con
+   `relevo`, que conserva la caja vieja mientras se esfuma. El de `fundido`
+   no cuenta: dura 180 ms y lleva fondo opaco, y la espera de abajo se midió
+   solo con la salida del relevo (160 ms). Con un fundido adentro la caja
+   viaja pareja, como antes. */
+const releva = (el) => !!el.querySelector('.ox-swap-out--over:not(.ox-swap-out--fundido)[data-state="closing"]');
+
+/* Cómo viaja una caja que cambia de tamaño. Sin nada yéndose adentro, in-out
+   parejo, como siempre. Con un relevo adentro importa el orden
+   (motion-timing §10: al achicarse, primero se va lo de adentro y después se
+   pliega la caja):
+   · Al ACHICARSE, espera a que el calco casi no se vea. Plegándose en el
+     acto, la caja le cortaba la frase que se iba cuando todavía estaba casi
+     entera: en el chip de Páginas de Quire, congelado, a los 60 ms le tapaba
+     7,5 px con opacidad 0,79 y a los 80 ms 17,6 px con 0,5; en la statusbar,
+     el nombre del documento; en Imprimir, la grilla de Múltiple a los 87 ms,
+     con la caja en 104 de 158 px y lo viejo al 51 %. La caja espera 100 ms
+     (la salida del relevo dura 160, in-out) y se pliega in-out, que en sus
+     primeros cuadros casi no se mueve. Medido cuadro por cuadro en el humo
+     (8-terdecies-bis): el calco va 100 → 93 → 85 → 71 → 50 → 29 → 15 → 7 %
+     y la caja sigue en su ancho hasta el 15 %; el primer recorte (3,5 px)
+     le llega con el 3 %. Sin la espera, con el 50 % ya le cortaba 71 px.
+     `fill: backwards` la tiene en el tamaño viejo durante la espera.
+   · Al CRECER no espera, y se abre rápido (expo-out): lo nuevo entra con el
+     retardo del relevo y encuentra la caja casi abierta. Con in-out la frase
+     nueva asomaba recortada por la caja que todavía se estaba abriendo (con
+     opacidad 0,5 le faltaba un cuarto del ancho; con expo-out, nada).
+   Es el glideSize de Prism (recetas §9). En Quire había dos copias locales
+   (deslizarBloque en Imprimir y deslizarAnchoRelevo en Páginas) y la
+   statusbar lo pedía aparte (2F), con el deslizarAncho de acá tal cual. */
+function viaje(achica, relevo) {
+  if (!relevo) return { duration: T.size, easing: EASE_BOTH };
+  return achica
+    ? { duration: T.size, delay: T.pliegue, easing: EASE_BOTH, fill: 'backwards' }
+    : { duration: T.size, easing: EASE };
+}
+
 /* La caja va del alto `h0` al que tiene ahora. Mientras viaja recorta lo que
    sobra (el calco de un relevo, que conserva el alto viejo). */
 function glideAlto(el, h0) {
   const h1 = el.getBoundingClientRect().height;
   if (Math.abs(h1 - h0) < 1 || reducido() || typeof el.animate !== 'function') return;
   el.__glide = el.animate([{ height: `${h0}px`, overflow: 'clip' }, { height: `${h1}px`, overflow: 'clip' }],
-    { duration: T.size, easing: EASE_BOTH });
+    viaje(h1 < h0, releva(el)));
 }
 
 /**
@@ -729,7 +906,9 @@ function glideAlto(el, h0) {
  * desde el que tenía hasta el nuevo, en vez de saltar. Para una caja que
  * cambia de forma adentro de un modal o una card: sin esto todo lo de abajo
  * —y el modal entero— cambiaba de alto en un cuadro (Apex, la zona de
- * cantidad al cambiar de sustancia).
+ * cantidad al cambiar de sustancia). Con un relevo adentro
+ * (`deslizarAlto(el, () => swap(el, html, { relevo: true }))`), al achicarse
+ * espera a que lo viejo casi no se vea, como deslizarAncho (ver viaje()).
  */
 export function deslizarAlto(el, cambio) {
   if (!el) { cambio(); return; }
@@ -739,6 +918,117 @@ export function deslizarAlto(el, cambio) {
   el.__glide?.cancel();
   cambio();
   glideAlto(el, h0);
+}
+
+/* Lo mismo a lo ancho: la caja va del ancho `w0` al que tiene ahora. Lo de
+   adentro no se acomoda en dos renglones mientras viaja: queda en uno y lo
+   que sobra se recorta. */
+function glideAncho(el, w0) {
+  const w1 = el.getBoundingClientRect().width;
+  if (Math.abs(w1 - w0) < 1 || reducido() || typeof el.animate !== 'function') return;
+  el.__glideAncho = el.animate([
+    { width: `${w0}px`, overflow: 'clip', whiteSpace: 'nowrap' },
+    { width: `${w1}px`, overflow: 'clip', whiteSpace: 'nowrap' },
+  ], viaje(w1 < w0, releva(el)));
+}
+
+/**
+ * deslizarAlto, a lo ancho: hace `cambio()` y el ancho de `el` va del que
+ * tenía al nuevo. Para un ítem de una fila que cambia de texto (la
+ * statusbar): sin esto cambiaba de ancho en un cuadro y todo lo que tenía a
+ * la derecha saltaba. En Quire, el nombre del documento al cambiar de
+ * pestaña, la impresora y el aviso de actualización (shell-22, shell-23).
+ * Con un relevo adentro (swap con `relevo`) va solo: el calco conserva la
+ * caja vieja y no cuenta para el ancho nuevo. Y respeta el orden: al
+ * achicarse espera a que lo que se va casi no se vea (ver viaje()).
+ */
+export function deslizarAncho(el, cambio) {
+  if (!el) { cambio(); return; }
+  const w0 = el.getBoundingClientRect().width;
+  el.__glideAncho?.cancel();
+  cambio();
+  glideAncho(el, w0);
+}
+
+/**
+ * Un botón que hace un trabajo, libre ↔ ocupado («Exportar» ↔ «Exportando…»
+ * con un spinner): un estado por otro, así que es un relevo en el lugar, y el
+ * ancho del botón viaja en vez de saltar (con la espera al achicarse). `html`
+ * es el rótulo del estado al que va.
+ *
+ * El estado vive en `data-ocupado` y no en la memoria de swap(): esa memoria
+ * es del nodo, y si la vista se repinta en medio del trabajo el botón es OTRO,
+ * que nace ya ocupado. Sin marca, el primer ocupar() sobre él relevaba el
+ * mismo rótulo por sí mismo. Por eso el HTML que lo arma lleva
+ * `data-ocupado="1"` cuando nace ocupado; sin la marca cuenta como libre.
+ * Llamarlo con el mismo estado no hace nada. Apagar el botón (`disabled`) es
+ * de quien lo llama: suele depender de más cosas que de este trabajo.
+ *
+ * Nació repetido en Quire (Herramientas, Convertir y el «Guardar» de Páginas,
+ * herr-14), cada uno con su copia.
+ */
+export function ocupar(btn, ocupado, html) {
+  if (!btn) return;
+  const v = ocupado ? '1' : '0';
+  if ((btn.dataset.ocupado ?? '0') === v) return;
+  btn.dataset.ocupado = v;
+  btn.setAttribute('aria-busy', String(!!ocupado));
+  deslizarAncho(btn, () => swap(btn, html, { relevo: true }));
+}
+
+/**
+ * Un contador que solo se ve cuando hay algo que contar (el de un ítem del
+ * rail: las páginas del documento, lo que falta convertir). `n` en 0, vacío o
+ * null es «nada»: el contador queda vacío.
+ * · aparece (vacío → n) o se va (n → vacío): se funde, con swap();
+ * · cambia (n → m): en su lugar, con destello, como numero();
+ * · vuelve mientras se iba (12 → 0 → 12, o 4 → 0 → 7): el que se iba se
+ *   revive desde la opacidad en que estaba y, si es otro número, cambia ahí
+ *   con destello. Con swap() la salida se cortaba de golpe y lo nuevo entraba
+ *   desde 0: medido, 0,93 → 0 en un cuadro.
+ * No se pueden mezclar swap() y numero() sobre el mismo nodo: cada uno lleva
+ * su memoria, y numero() compara contra el textContent, que durante una
+ * salida todavía tiene el número que se va. numero(el, '') además corta de
+ * golpe. La memoria acá es una sola (`__cuenta`), y el número que cambia se
+ * escribe en el hijo que dejó swap(), no en el nodo entero, para no
+ * reemplazar el que ya está. Como numero(), nace vacío en el HTML.
+ *
+ * De Quire (app.js, shell-25 y herr-30; corrección 8 del plan de la
+ * auditoría): se escribía con textContent y saltaba de 4 a 12 al cambiar de
+ * pestaña, o entraba y se iba en un cuadro.
+ */
+export function contador(el, n) {
+  if (!el) return;
+  const v = n ? String(n) : '';
+  const antes = el.__cuenta ?? el.textContent.trim();
+  if (v === antes) return;
+  el.__cuenta = v;
+  const yendose = v ? el.querySelector(':scope > .ox-swap-out[data-state="closing"]') : null;
+  if (yendose) { revivirCuenta(el, yendose, v); return; }
+  if (!v || !antes) { swap(el, v); return; }
+  const vivo = el.querySelector(':scope > :not(.ox-swap-out)');
+  if (vivo) vivo.textContent = v; else el.textContent = v;
+  ultimo.set(el, v);
+  tick(el);
+}
+
+/* El número que se iba vuelve: sin data-state, exit() no lo saca (ver exit),
+   y sube desde donde estaba con la curva de las entradas chicas. */
+function revivirCuenta(el, hijo, v) {
+  const op = +getComputedStyle(hijo).opacity;
+  const otro = hijo.textContent.trim() !== v;
+  delete hijo.dataset.state;
+  hijo.classList.remove('ox-swap-out');
+  hijo.inert = false;
+  hijo.style.opacity = '';
+  hijo.textContent = v;
+  // swap() tiene que saber que el contador vuelve a mostrar algo: si no, el
+  // próximo 0 le parecería el mismo vacío de la última vez y no haría nada.
+  ultimo.set(el, v);
+  if (!reducido() && typeof hijo.animate === 'function' && op < 0.99) {
+    hijo.animate([{ opacity: op }, { opacity: 1 }], { duration: T.size, easing: EASE_SOFT });
+  }
+  if (otro) tick(el);
 }
 
 /* ── Listas que se ponen al día ─────────────────────────────────────────────
