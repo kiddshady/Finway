@@ -75,7 +75,12 @@ function loQuePideElRenderer() {
   // Las tipografías las pide el CSS, no el HTML.
   for (const css of [...necesarios].filter((r) => r.endsWith('.css'))) {
     if (!existe(css)) continue;
-    const texto = fs.readFileSync(path.join(ROOT, css), 'utf8');
+    // Los data: entre comillas se sacan enteros antes de buscar: el grano de la
+    // niebla de Opal es un SVG en línea que adentro lleva su propio
+    // `filter='url(%23n)'`, y sin esto ese url() de adentro se leía como un
+    // archivo al lado del CSS.
+    const texto = fs.readFileSync(path.join(ROOT, css), 'utf8')
+      .replace(/url\(\s*"data:[^"]*"\s*\)|url\(\s*'data:[^']*'\s*\)/g, '');
     for (const [, url] of texto.matchAll(/url\(['"]?([^'")]+)['"]?\)/g)) {
       if (url.startsWith('data:')) continue;
       necesarios.add(path.posix.normalize(path.posix.join(path.posix.dirname(css), url)));
