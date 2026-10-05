@@ -1,11 +1,17 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   ONYX — controles
+   OPAL — controles (en Finway: la mecánica de Onyx con la piel de Opal)
    Botones, campos, switches, segmentados. Ninguno es un control nativo de
    Chromium: cada uno está dibujado, y cada cambio de estado tiene transición.
 
-   En un sistema acromático el acento ES la luz: el botón primario se rellena
-   de blanco y su tinta es el fondo de la app. Por eso hay como máximo UN
-   primario por pantalla — dos blancos compitiendo rompen la jerarquía entera.
+   La ley del énfasis en Opal: LA LUZ NO RELLENA, TALLA. Lo primario no es un
+   plano de luz (eso es Onyx): es el objeto más profundo de la pantalla con el
+   canto más vivo — obsidiana. El acento vive en cantos, líneas y puntos, y
+   nunca inunda una superficie. Sigue habiendo UN primario por pantalla.
+
+   Los campos son POZOS: alfa de negro que hunde sobre cualquier hoja. Los
+   botones con superficie son HOJAS chicas: relleno de luz + canto iluminado.
+   Así el mismo control funciona sobre la niebla, sobre una card o sobre un
+   modal sin declarar variantes por contexto.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .ox-btn {
@@ -36,24 +42,34 @@
   pointer-events: none;
 }
 
-/* Primario: blanco pleno. El único de la pantalla. */
+/* Primario: obsidiana. No es el plano más claro de la pantalla — es el más
+   PROFUNDO, con el canto más vivo. La luz no rellena: talla. Sigue habiendo
+   uno solo por pantalla: dos pozos compitiendo confunden igual que dos
+   blancos. */
 .ox-btn--primary {
-  background: var(--ox-accent);
-  color: var(--ox-accent-ink);
+  background: var(--ox-deep);
+  color: var(--ox-text);
   font-weight: var(--ox-w-semi);
-  box-shadow: var(--ox-e1);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .16), inset 0 0 0 1px var(--ox-rim), var(--ox-e2);
 }
-.ox-btn--primary:hover { background: #fff; box-shadow: var(--ox-e2); }
+.ox-btn--primary:hover {
+  background: var(--ox-deep-2);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .22), inset 0 0 0 1px var(--ox-rim-2),
+              0 0 16px rgb(var(--ox-accent-rgb) / .08), var(--ox-e2);
+}
 .ox-btn--primary:disabled { background: var(--ox-s3); color: var(--ox-text-4); box-shadow: none; }
 
-/* Secundario: superficie elevada con contorno fino (inset, no border — un
-   border real deja hilacha de 1px en las esquinas con overflow:hidden). */
+/* Secundario: una hoja chica — relleno de luz con canto iluminado (inset, no
+   border: un border real deja hilacha de 1px en las esquinas con overflow:hidden). */
 .ox-btn--secondary {
   background: var(--ox-s2);
   color: var(--ox-text);
-  box-shadow: var(--ox-hairline), var(--ox-e1);
+  box-shadow: var(--ox-sheet), var(--ox-e1);
 }
-.ox-btn--secondary:hover { background: var(--ox-s3); box-shadow: inset 0 0 0 1px var(--ox-line-2), var(--ox-e2); }
+.ox-btn--secondary:hover {
+  background: var(--ox-s3);
+  box-shadow: inset 0 1px 0 var(--ox-edge-lit), inset 0 0 0 1px var(--ox-line-2), var(--ox-e2);
+}
 
 /* Ghost: sin superficie hasta que lo tocás. */
 .ox-btn--ghost:hover { background: var(--ox-wash-1); color: var(--ox-text); }
@@ -67,7 +83,7 @@
   color: #fff;
   box-shadow: var(--ox-e1);
 }
-.ox-btn--danger-solid:hover { background: #a04a50; }
+.ox-btn--danger-solid:hover { background: var(--ox-danger-hover); }
 
 /* Un botón de texto apagado que tiene tooltip lo sigue mostrando: dice POR
    QUÉ está apagado. Con pointer-events: none (arriba) se veía apagado y mudo;
@@ -79,7 +95,7 @@
    .ox-iconbtn (U3). Nació como .qr-explica en Quire (octubre de 2026). */
 .ox-btn[data-tip]:disabled { pointer-events: auto; }
 .ox-btn[data-tip]:disabled:active { transform: none; }
-.ox-btn--secondary[data-tip]:disabled:hover { background: var(--ox-s2); box-shadow: var(--ox-hairline), var(--ox-e1); }
+.ox-btn--secondary[data-tip]:disabled:hover { background: var(--ox-s2); box-shadow: var(--ox-sheet), var(--ox-e1); }
 .ox-btn--ghost[data-tip]:disabled:is(:hover, :active),
 .ox-btn--danger[data-tip]:disabled:hover { background: transparent; color: var(--ox-text-4); }
 .ox-btn--danger-solid[data-tip]:disabled:hover { background: var(--ox-danger-dim); }
@@ -140,7 +156,7 @@
   color: var(--ox-text-3);
   letter-spacing: .01em;
 }
-.ox-field__hint { font-size: var(--ox-fs-11); color: var(--ox-text-4); }
+.ox-field__hint { font-size: var(--ox-fs-11); color: var(--ox-text-3); }
 .ox-field__hint--error { color: var(--ox-danger); }
 
 .ox-input,
@@ -165,12 +181,16 @@
 .ox-textarea:hover { box-shadow: inset 0 0 0 1px var(--ox-line-2); }
 .ox-input:focus,
 .ox-textarea:focus {
-  background: var(--ox-bg);
+  background: var(--ox-sunken-2);
   box-shadow: inset 0 0 0 1px var(--ox-line-3), 0 0 0 3px var(--ox-wash-1);
 }
 .ox-input.is-invalid,
 .ox-textarea.is-invalid { box-shadow: inset 0 0 0 1px var(--ox-danger-ring); }
 .ox-textarea { min-height: 88px; resize: vertical; line-height: var(--ox-lh); }
+/* Con foco el pozo se hunde más: la atención baja hacia donde se escribe.
+   Ese pozo ya es su marca de foco: el anillo genérico encima sería un doble borde. */
+.ox-input:focus-visible,
+.ox-textarea:focus-visible { outline: none; }
 /* El agarrador de estirar, dibujado. Con `resize` Chromium pinta el suyo en la
    esquina —dos rayitas grises de sistema— y era lo único nativo que quedaba a
    la vista en un campo. Dos trazos en diagonal con el color de los tokens, así
@@ -231,7 +251,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--ox-text-4);
+  /* text-3 y no text-4: una flecha que anda se tiene que ver (con text-4
+     medía 1,7:1 contra el campo, y un control pide 3:1). */
+  color: var(--ox-text-3);
   cursor: pointer;
   /* La opacidad también: el apagado del tope (.25, abajo) caía de un cuadro
      al otro al llegar al mínimo o al máximo (Quire, Dividir). */
@@ -268,7 +290,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   transition: box-shadow var(--ox-t-2) var(--ox-ease-soft), background-color var(--ox-t-2) var(--ox-ease-soft);
 }
 .ox-select:hover { box-shadow: inset 0 0 0 1px var(--ox-line-2); }
-.ox-select.is-open { background: var(--ox-bg); box-shadow: inset 0 0 0 1px var(--ox-line-3); }
+.ox-select.is-open { background: var(--ox-sunken-2); box-shadow: inset 0 0 0 1px var(--ox-line-3); }
 .ox-select__value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ox-select__value:empty::before { content: attr(data-placeholder); color: var(--ox-text-4); }
 .ox-select .ox-icon { color: var(--ox-text-4); transition: transform var(--ox-t-2) var(--ox-ease), color var(--ox-t-1) var(--ox-ease-soft); }
@@ -300,8 +322,13 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   transition: transform var(--ox-t-2) var(--ox-ease), background-color var(--ox-t-2) var(--ox-ease-soft);
 }
 .ox-switch:hover::after { background: var(--ox-text-2); }
-.ox-switch.is-on { background: var(--ox-accent); }
-.ox-switch.is-on::after { transform: translateX(13px); background: var(--ox-accent-ink); }
+/* Encendido = tallado: el track se hunde y enciende el canto; el punto de luz
+   es el knob, no el plano. */
+.ox-switch.is-on {
+  background: var(--ox-deep);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .10), inset 0 0 0 1px var(--ox-rim);
+}
+.ox-switch.is-on::after { transform: translateX(13px); background: var(--ox-text); }
 
 /* ── Checkbox ─────────────────────────────────────────────────────────────────
    El tilde es un SVG que se DIBUJA (stroke-dashoffset), no un ✓ que aparece. */
@@ -328,7 +355,13 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   stroke-dashoffset: 16;
   transition: stroke-dashoffset var(--ox-t-3) var(--ox-ease);
 }
-.ox-check.is-on { background: var(--ox-accent); box-shadow: none; }
+/* Marcado = tallado: pozo con el canto vivo, y el tilde se dibuja EN LUZ —
+   la luz queda en el trazo, nunca en el plano. */
+.ox-check.is-on {
+  background: var(--ox-deep);
+  box-shadow: inset 0 0 0 1px var(--ox-rim);
+  color: var(--ox-text);
+}
 .ox-check.is-on .ox-icon { stroke-dashoffset: 0; }
 
 /* ── Segmentado ───────────────────────────────────────────────────────────────
@@ -371,7 +404,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   height: calc(100% - 4px);
   border-radius: var(--ox-r-xs);
   background: var(--ox-s3);
-  box-shadow: var(--ox-e1);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .07), var(--ox-e1);
   transform: translateX(var(--seg-x, 2px));
   transition: transform var(--ox-t-3) var(--ox-ease), width var(--ox-t-3) var(--ox-ease);
 }
@@ -398,7 +431,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 /* El anillo va hacia adentro, con las esquinas de la cápsula: el de base.css
    sale 3.5px por fuera y acá hay 2px de carril, así que se pisaba con el
    canto del control y con las opciones vecinas. */
-.ox-segmented__opt:focus-visible { box-shadow: inset 0 0 0 1.5px var(--ox-ring); border-radius: var(--ox-r-xs); }
+.ox-segmented__opt:focus-visible { outline-offset: -1.5px; border-radius: var(--ox-r-xs); }
 .ox-segmented__opt:hover { color: var(--ox-text-2); }
 .ox-segmented__opt.is-active { color: var(--ox-text); }
 .ox-segmented__opt .ox-icon { width: 12px; height: 12px; }
@@ -443,7 +476,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   padding: 0 5px;
   border-radius: var(--ox-r-xs);
   background: var(--ox-s3);
-  box-shadow: var(--ox-hairline), 0 1px 0 rgba(0, 0, 0, .35);
+  box-shadow: var(--ox-sheet), 0 1px 0 rgba(0, 0, 0, .35);
   font-family: var(--ox-font);
   font-size: var(--ox-fs-10);
   font-weight: var(--ox-w-medium);

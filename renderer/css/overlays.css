@@ -1,8 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   ONYX — overlays
+   OPAL — overlays (en Finway: el de Onyx con la piel de Opal)
    Tooltip, menú, modal y toast. Todos portaleados a #ox-layer,
    todos con entrada Y salida (nada se corta al cerrarse), todos propios: ni un
    title= nativo, ni un confirm() del sistema.
+
+   Acá vive el vidrio en su mejor momento: un overlay flota sobre CONTENIDO —
+   texto, listas, color— y el blur convierte todo eso en profundidad. Por eso
+   los overlays sí llevan backdrop-filter, y lo que vive adentro de ellos, no.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 #ox-layer {
@@ -20,17 +24,22 @@
   position: absolute;
   max-width: 260px;
   padding: 5px var(--ox-2);
-  border-radius: var(--ox-r-sm);
-  background: var(--ox-s4);
+  border-radius: var(--ox-r-md);
+  background: var(--ox-s3);
+  backdrop-filter: var(--ox-glass);
   color: var(--ox-text);
   font-size: var(--ox-fs-11);
   line-height: 1.45;
-  box-shadow: var(--ox-hairline), var(--ox-e3);
+  /* Una cadena sin espacios —C:\...\Roaming\App\data— no tiene dónde
+     partirse: sin `anywhere` desborda la burbuja en vez de envolver, y el
+     tooltip sale con el texto colgando afuera del vidrio. */
+  overflow-wrap: anywhere;
+  box-shadow: var(--ox-sheet), var(--ox-e3);
   animation: ox-pop-in var(--ox-t-2) var(--ox-ease) both;
   will-change: transform, opacity;
 }
 .ox-tooltip[data-state='closing'] { animation: ox-pop-out 100ms var(--ox-ease-in) both; }
-.ox-tooltip__key { margin-left: var(--ox-2); color: var(--ox-text-4); }
+.ox-tooltip__key { margin-left: var(--ox-2); color: var(--ox-text-3); }
 
 /* ── Menú contextual / dropdown ──────────────────────────────────────────── */
 /* Los overlays que scrollean también se esfuman: la regla del corte-nunca no
@@ -63,9 +72,10 @@
   min-width: 180px;
   max-height: 60vh;
   padding: var(--ox-1);
-  border-radius: var(--ox-r-md);
+  border-radius: var(--ox-r-lg);
   background: var(--ox-s3);
-  box-shadow: var(--ox-hairline), var(--ox-e4);
+  backdrop-filter: var(--ox-glass-heavy);
+  box-shadow: var(--ox-sheet), var(--ox-e4);
   overflow-y: auto;
   animation: ox-pop-in var(--ox-t-2) var(--ox-ease) both;
   transform-origin: var(--origin, top left);
@@ -87,7 +97,7 @@
   cursor: default;
   transition: var(--tr-color);
 }
-.ox-menuitem .ox-icon { width: 14px; height: 14px; color: var(--ox-text-4); transition: color var(--ox-t-1) var(--ox-ease-soft); }
+.ox-menuitem .ox-icon { width: 14px; height: 14px; color: var(--ox-text-3); transition: color var(--ox-t-1) var(--ox-ease-soft); }
 .ox-menuitem:hover, .ox-menuitem.is-active { background: var(--ox-wash-2); color: var(--ox-text); }
 .ox-menuitem:hover .ox-icon, .ox-menuitem.is-active .ox-icon { color: var(--ox-text-2); }
 .ox-menuitem.is-selected .ox-icon:last-child { color: var(--ox-accent); }
@@ -114,7 +124,7 @@
 .ox-menuitem__dot { width: 8px; height: 8px; margin: 0 3px; border-radius: 2px; flex: 0 0 auto; }
 /* Apagado sin hover: no se puede elegir, así que tampoco se resalta. */
 .ox-menuitem:disabled { opacity: .38; pointer-events: none; }
-.ox-menuitem__key { margin-left: auto; font-size: var(--ox-fs-10); color: var(--ox-text-4); }
+.ox-menuitem__key { margin-left: auto; font-size: var(--ox-fs-10); color: var(--ox-text-3); }
 /* La aclaración de un ítem (`hint`): atenuada y a la derecha del nombre, que
    es el que cede si no entra. Con el resaltado sube un escalón, como el ícono.
    Si además hay atajo, el atajo va pegado a ella (el `gap` los separa). */
@@ -122,7 +132,7 @@
   flex: 0 0 auto;
   margin-left: auto;
   font-size: var(--ox-fs-11);
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
   white-space: nowrap;
   transition: color var(--ox-t-1) var(--ox-ease-soft);
 }
@@ -136,15 +146,19 @@
   font-weight: var(--ox-w-semi);
   letter-spacing: var(--ox-track-caps);
   text-transform: uppercase;
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
 }
 
 /* ── Modal ───────────────────────────────────────────────────────────────── */
 .ox-scrim {
   position: fixed;
   inset: 0;
-  background: rgba(4, 5, 6, .62);
-  backdrop-filter: blur(2px);
+  /* El scrim ES vidrio: esmerila la app entera detrás del diálogo. Es el
+     momento más glassmorphism del sistema, y también el más caro — por eso
+     solo existe mientras hay un modal abierto, y el blur en sí no se anima
+     nunca (entra y sale por opacity). */
+  background: var(--ox-scrim);
+  backdrop-filter: blur(10px) saturate(120%);
   animation: ox-fade-in var(--ox-t-3) var(--ox-ease) both;
 }
 /* El velo que se estaba yendo y vuelve, porque otro modal abrió enseguida
@@ -188,9 +202,10 @@
   flex-direction: column;
   margin: 0;
   border-radius: var(--ox-r-xl);
-  --ox-surface: var(--ox-s3);
-  background: var(--ox-surface);
-  box-shadow: var(--ox-hairline), var(--ox-e4);
+  --ox-surface-luz: var(--ox-s3);
+  background: var(--ox-surface-luz);
+  backdrop-filter: var(--ox-glass-heavy);
+  box-shadow: var(--ox-sheet), var(--ox-e4);
   overflow: hidden;
 }
 /* Un modal que pisa a otro (o abre mientras el anterior sale): las dos cajas
@@ -201,6 +216,9 @@
 .ox-modal__anim.is-after { animation-delay: 90ms; }
 .ox-modal__anim[data-state='closing'] { animation: ox-lift-out var(--ox-t-2) var(--ox-ease-in) both; }
 .ox-modal__anim--pisada[data-state='closing'] { animation: ox-lift-out 160ms var(--ox-ease-both) both; }
+/* El foco está en el diálogo mismo, que no lleva el anillo genérico: le
+   cambiaría el radio y lo dibujaría por fuera del vidrio. */
+.ox-modal:focus-visible { outline: none; border-radius: var(--ox-r-xl); }
 .ox-modal__head { padding: var(--ox-5) var(--ox-5) var(--ox-3); display: flex; align-items: flex-start; gap: var(--ox-3); }
 .ox-modal__title { font-size: var(--ox-fs-15); font-weight: var(--ox-w-semi); letter-spacing: var(--ox-track-tight); }
 .ox-modal__sub { font-size: var(--ox-fs-12); color: var(--ox-text-3); margin-top: 4px; line-height: var(--ox-lh-loose); }
@@ -211,7 +229,8 @@
   justify-content: flex-end;
   gap: var(--ox-2);
   padding: var(--ox-3) var(--ox-5);
-  background: var(--ox-s2);
+  /* El pie es la base de la hoja: se hunde apenas, no sube. */
+  background: var(--ox-foot);
   box-shadow: inset 0 1px 0 var(--ox-line);
 }
 
@@ -230,9 +249,10 @@
   align-items: flex-start;
   gap: var(--ox-3);
   padding: var(--ox-3);
-  border-radius: var(--ox-r-md);
+  border-radius: var(--ox-r-lg);
   background: var(--ox-s3);
-  box-shadow: var(--ox-hairline), var(--ox-e4);
+  backdrop-filter: var(--ox-glass);
+  box-shadow: var(--ox-sheet), var(--ox-e4);
   animation: ox-slide-in-r var(--ox-t-3) var(--ox-ease) both;
   overflow: hidden;
   position: relative;
@@ -244,7 +264,7 @@
 .ox-toast__text { font-size: var(--ox-fs-11); color: var(--ox-text-3); margin-top: 2px; line-height: var(--ox-lh); user-select: text; }
 .ox-toast__action { margin-top: 8px; }
 .ox-toast--error > .ox-icon { color: var(--ox-danger); }
-.ox-toast--error { box-shadow: inset 0 0 0 1px var(--ox-danger-ring), var(--ox-e4); }
+.ox-toast--error { box-shadow: inset 0 1px 0 var(--ox-edge-lit), inset 0 0 0 1px var(--ox-danger-ring), var(--ox-e4); }
 /* La barra de vida: se consume sola y muestra cuánto le queda. */
 .ox-toast__life {
   position: absolute;

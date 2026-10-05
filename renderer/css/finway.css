@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    FINWAY — lo propio del dominio
-   Todo lo demás sale de Onyx. Acá vive únicamente lo que Onyx no puede saber:
+   Todo lo demás sale del sistema (Onyx con la piel de Opal). Acá vive únicamente lo que el sistema no puede saber:
    qué significan los colores de esta app y cómo se dibujan sus gráficos.
 
    La regla de color de Finway, en una línea: el SHELL es acromático (el
@@ -124,7 +124,7 @@
 .fw-kpi--bal  .ox-stat__value { font-size: var(--ox-fs-26) }
 .fw-kpi__sub {
   font-size: var(--ox-fs-11);
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
   animation: ox-fade-in var(--ox-t-3) var(--ox-ease) both;
 }
 
@@ -147,7 +147,7 @@
 .fw-grid-line { stroke: var(--ox-line); stroke-width: 1; }
 .fw-axis      { stroke: var(--ox-line-2); stroke-width: 1; }
 .fw-tick {
-  fill: var(--ox-text-4);
+  fill: var(--ox-text-3);
   font-family: var(--ox-mono);
   font-size: 9.5px;
   font-variant-numeric: tabular-nums;
@@ -170,21 +170,21 @@
   font-family: var(--ox-mono);
   font-size: var(--ox-fs-10);
   letter-spacing: var(--ox-track-caps);
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
 }
 /* Las cifras del readout van neutras: quien dice de qué serie es cada una es
    el signo, y la leyenda de al lado con su línea o su punto teñido. */
 .fw-readout__in  { color: var(--ox-text-2); font-variant-numeric: tabular-nums }
 .fw-readout__out { color: var(--ox-text-2); font-variant-numeric: tabular-nums }
 .fw-readout__net { margin-left: auto; color: var(--ox-text-2); font-variant-numeric: tabular-nums }
-.fw-readout__hint { margin-left: auto; color: var(--ox-text-4) }
+.fw-readout__hint { margin-left: auto; color: var(--ox-text-3) }
 /* El delta contra el mes anterior sí va teñido: acá el color no dice de qué
    serie es, dice si el cambio es bueno (verde) o malo (rojo). */
 .fw-readout__delta { margin-left: auto; display: inline-flex; align-items: baseline; gap: 6px; color: var(--ox-text-3); font-variant-numeric: tabular-nums }
 .fw-readout__delta--good { color: var(--fw-in) }
 .fw-readout__delta--bad  { color: var(--fw-out) }
 .fw-readout__pct { font-family: var(--ox-mono); font-size: var(--ox-fs-10); opacity: .75 }
-.fw-key { display: inline-flex; align-items: center; gap: 6px; color: var(--ox-text-4) }
+.fw-key { display: inline-flex; align-items: center; gap: 6px; color: var(--ox-text-3) }
 .fw-key__line { width: 14px; height: 2px; border-radius: 1px; background: currentColor }
 .fw-key__dot  { width: 8px; height: 8px; border-radius: 2px; background: currentColor }
 .fw-key--in   { color: var(--fw-in) }
@@ -216,7 +216,7 @@
   font-size: var(--ox-fs-10);
   letter-spacing: var(--ox-track-caps);
   text-transform: uppercase;
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
   transition: var(--tr-color);
 }
 .fw-donut__center-amount {
@@ -226,7 +226,7 @@
   color: var(--ox-text);
   letter-spacing: var(--ox-track-tight);
 }
-.fw-donut__center-sub { font-size: var(--ox-fs-11); color: var(--ox-text-4) }
+.fw-donut__center-sub { font-size: var(--ox-fs-11); color: var(--ox-text-3) }
 
 .fw-legend { display: flex; flex-direction: column; gap: 1px; margin-top: var(--ox-3) }
 .fw-legend__item {
@@ -249,7 +249,7 @@
   text-align: right;
   font-family: var(--ox-mono);
   font-size: var(--ox-fs-10);
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
 }
 .fw-dot { width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto }
 
@@ -292,7 +292,7 @@
 .fw-bargroup { animation: fw-bar-in .5s var(--ox-ease) both }
 @keyframes fw-bar-in { from { transform: scaleY(0); opacity: 0 } to { transform: scaleY(1); opacity: 1 } }
 .fw-bar-month {
-  fill: var(--ox-text-4);
+  fill: var(--ox-text-3);
   font-size: 9.5px;
   letter-spacing: var(--ox-track-caps);
   transition: var(--tr-color);
@@ -372,8 +372,12 @@
   min-width: 180px;
   padding: var(--ox-2) var(--ox-3);
   border-radius: var(--ox-r-md);
-  background: var(--ox-s3);
-  box-shadow: var(--ox-hairline), var(--ox-e3);
+  /* Opaco y no vidrio: vive adentro del .ox-scroll de la vista, y la máscara
+     del esfumado es frontera de backdrop —el blur no muestrearía nada—. Con
+     el alfa de una hoja a secas, las líneas del gráfico se leían a través
+     del texto. Es el fondo con la luz de una hoja alta encima, ya mezclado. */
+  background: color-mix(in srgb, var(--ox-bg), white 8.5%);
+  box-shadow: var(--ox-sheet), var(--ox-e3);
   font-size: var(--ox-fs-12);
   pointer-events: none;
   opacity: 0;
@@ -403,7 +407,7 @@
   display: grid;
   place-items: center;
   font-size: var(--ox-fs-12);
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--ox-t-3) var(--ox-ease-soft);
@@ -468,7 +472,7 @@
               background-color var(--ox-t-2) var(--ox-ease-soft);
 }
 .fw-amountfield:focus-within {
-  background: var(--ox-bg);
+  background: var(--ox-sunken-2);
   box-shadow: inset 0 0 0 1px var(--ox-line-3), 0 0 0 3px var(--ox-wash-1);
 }
 .fw-amountfield__currency { font-size: var(--ox-fs-19); color: var(--ox-text-4) }
@@ -568,15 +572,21 @@
 .fw-dp__portal {
   position: fixed;
   z-index: 60;
+  /* El vidrio va acá y no en el popover: el portal es el que anima, y una
+     animación retenida (`both`) en un ANCESTRO deja ciego al backdrop-filter
+     de adentro —computa el blur y no pinta nada—. En el mismo elemento que
+     anima, no: así lo hacen los menús de overlays.css. */
+  border-radius: var(--ox-r-lg);
+  backdrop-filter: var(--ox-glass-heavy);
   animation: ox-lift-in var(--ox-t-2) var(--ox-ease) both;
 }
 .fw-dp__portal[data-state='closing'] { animation: ox-lift-out var(--ox-t-2) var(--ox-ease-in) both }
 .fw-dp__pop {
   width: 238px;
   padding: var(--ox-3);
-  border-radius: var(--ox-r-md);
+  border-radius: var(--ox-r-lg);
   background: var(--ox-s3);
-  box-shadow: var(--ox-hairline), var(--ox-e3);
+  box-shadow: var(--ox-sheet), var(--ox-e3);
 }
 .fw-dp__head { display: flex; align-items: center; margin-bottom: var(--ox-2) }
 .fw-dp__month {
@@ -591,7 +601,7 @@
   text-align: center;
   font-size: 9px;
   letter-spacing: .5px;
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
   padding-bottom: 3px;
 }
 /* El fondo y el padding van declarados a mano. base.css resetea el padding de
@@ -616,13 +626,15 @@
 .fw-dp__day.is-today { box-shadow: inset 0 0 0 1px var(--ox-line-3); color: var(--ox-text) }
 /* Hoy y seleccionado son el mismo día casi siempre, y el amarillo de la
    selección con la tinta cyan de hoy encima daba un oliva ilegible. Cuando
-   coinciden gana la selección, que es la que el usuario está mirando. */
+   coinciden gana la selección, que es la que el usuario está mirando.
+   Con la piel de Opal el elegido no se rellena de luz: se TALLA, pozo con el
+   canto vivo (como el check y el switch encendidos). */
 .fw-dp__day.is-selected,
 .fw-dp__day.is-selected.is-today {
-  background: var(--ox-accent);
-  color: var(--ox-bg);
+  background: var(--ox-deep);
+  color: var(--ox-text);
   font-weight: var(--ox-w-semi);
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--ox-rim-2);
 }
 .fw-dp__foot { display: flex; justify-content: flex-end; margin-top: var(--ox-2) }
 
@@ -676,7 +688,7 @@
 /* Con foco, el mismo anillo que el resto de los campos (.ox-input:focus). */
 .fw-calc__titulo:focus,
 .fw-calc__titulo:focus-visible {
-  background: var(--ox-bg);
+  background: var(--ox-sunken-2);
   box-shadow: inset 0 0 0 1px var(--ox-line-3), 0 0 0 3px var(--ox-wash-1);
 }
 .fw-calc__titulo:focus::placeholder { color: var(--ox-text-4); }

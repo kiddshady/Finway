@@ -1,23 +1,35 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   ONYX — base
+   OPAL — base (en Finway: el de Onyx con la piel de Opal)
    Reset, tipografía y el reemplazo de TODO lo nativo de Chromium:
    scrollbar, selección, focus ring. Nada acá delata que adentro hay un browser.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 *, *::before, *::after { box-sizing: border-box; }
 
-/* `--ox-surface` es «la superficie sobre la que estoy». La declara cada plano
-   que aloja contenido —acá la base; y la card, el inspector y el modal— en el
-   mismo renglón donde pinta su fondo, y pinta CON ella, así las dos no se pueden
-   desencontrar. La lee lo que necesita ser opaco del color de su entorno sin
-   saber dónde cayó: el encabezado sticky de una tabla, que sobre la vista es
-   --ox-bg y dentro de una card es --ox-s2. */
+/* La interfaz es oscura, y lo dice. Lo que Chromium dibuja por su cuenta (el
+   calendario de un campo de fecha, el selector de color, las sugerencias de
+   un campo) sale oscuro y no con el blanco de fábrica. Y si se prende el
+   oscurecido a la fuerza de Chromium (--blink-settings=forceDarkModeEnabled),
+   esta página queda afuera: ya es oscura y no hay nada que invertir. */
+:root { color-scheme: dark; }
+
+/* `--ox-surface-luz` es «la luz de la hoja sobre la que estoy». Con la piel de
+   Opal las hojas son TRANSLÚCIDAS: una card es un 5,5 % de luz encima de la
+   niebla, y la niebla encima del fondo. La declara cada plano que aloja
+   contenido —la card, el inspector y el modal— en el mismo renglón donde pinta
+   su fondo, y pinta CON ella, así las dos no se pueden desencontrar. Acá, en la
+   base, no hay hoja: luz ninguna.
+   La lee lo que necesita ser OPACO e igual a su entorno sin saber dónde cayó:
+   el encabezado sticky de una tabla, que tapa las filas que pasan por debajo.
+   Se pinta la niebla alineada con la de la ventana y, encima, esta luz. En
+   Onyx era `--ox-surface`, un color sólido: sobre el vidrio dejaba una franja
+   negra. */
 html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  --ox-surface: var(--ox-bg);
-  background: var(--ox-surface);
+  --ox-surface-luz: transparent;
+  background: var(--ox-bg);
 }
 
 body {
@@ -107,14 +119,19 @@ p, code, pre,
 ::-webkit-scrollbar-thumb:active { background-color: rgba(255, 255, 255, .28); }
 
 /* ── Focus ring propio ───────────────────────────────────────────────────────
-   Solo con teclado (:focus-visible), nunca el outline azul del sistema.
-   Doble anillo: uno del color del fondo que despega, otro de luz. */
+   Solo con teclado (:focus-visible), nunca el outline azul del sistema. Es un
+   outline y no una sombra (así lo hace Opal): los controles de vidrio declaran
+   su propio box-shadow —el canto iluminado de la hoja— en una hoja que carga
+   después, con la misma especificidad, y le ganaban al anillo: quedaban sin
+   ninguna marca de foco. El outline no compite con nadie, sigue el
+   border-radius, y el offset deja el aire del fondo entre el control y la luz.
+   Lo que marca el foco a su manera (un campo que se hunde) lo apaga con
+   outline: none. */
 :focus { outline: none; }
 :focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--ox-bg), 0 0 0 3.5px var(--ox-ring);
+  outline: 1.5px solid var(--ox-ring);
+  outline-offset: 2px;
   border-radius: var(--ox-r-sm);
-  transition: box-shadow var(--ox-t-1) var(--ox-ease-soft);
 }
 
 /* ── Tipografía utilitaria ─────────────────────────────────────────────────── */

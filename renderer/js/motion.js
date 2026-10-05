@@ -159,7 +159,7 @@ export function swap(el, html, { relevo = false, fundido = false } = {}) {
     if (getComputedStyle(el).position === 'static') el.classList.add('ox-swap-host');
     // El fondo, del primer opaco hacia arriba: el calco no lleva la clase de
     // ninguna superficie que lo traiga.
-    if (fundido) calco.style.background = fondoDetras(el);
+    if (fundido) pintarFondoDetras(calco, el);
     el.prepend(calco);
     // Mover un nodo le reinicia las animaciones CSS: lo que tenía su propia
     // entrada volvería a entrar desde cero adentro del calco que se va. Se da
@@ -217,14 +217,35 @@ function cajaDe(el) {
   };
 }
 
-/** El primer fondo opaco hacia arriba: lo que el calco de un fundido tiene que
-    llevar para tapar lo nuevo sin que se note un parche. */
-function fondoDetras(el) {
+/** Lo que el calco de un fundido tiene que llevar para tapar lo nuevo sin que
+    se note un parche: lo que se ve detrás de `el`.
+
+    Con la piel de Opal (Finway, octubre de 2026) las hojas son translúcidas:
+    una card es un 5,5 % de luz encima de la niebla, y la niebla encima del
+    fondo. Con solo el primer fondo opaco —el de la ventana— el calco salía
+    más oscuro que la card que tapaba, y el fundido era un parche negro de
+    180 ms. Así que se apilan las tres cosas: el opaco de abajo, la niebla
+    alineada con la de la ventana (si ese opaco es la app, que es donde vive
+    la niebla) y cada hoja translúcida del camino, como sombras inset, que se
+    pintan encima del fondo y debajo del contenido. La más cercana va arriba. */
+function pintarFondoDetras(calco, el) {
+  const hojas = [];
+  let base = null;
+  let deLaApp = false;
   for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
     const bg = getComputedStyle(n).backgroundColor;
-    if (alfaDe(bg) >= 1) return bg;
+    const a = alfaDe(bg);
+    if (a >= 1) { base = bg; deLaApp = n.matches('.ox-app, body, html'); break; }
+    if (a > 0) hojas.push(bg);
   }
-  return getComputedStyle(document.body).backgroundColor;
+  base ??= getComputedStyle(document.body).backgroundColor;
+  if (deLaApp) {
+    calco.style.background = `var(--ox-sustrato), ${base}`;
+    calco.style.backgroundAttachment = 'fixed';
+  } else {
+    calco.style.background = base;
+  }
+  if (hojas.length) calco.style.boxShadow = hojas.map((c) => `inset 0 0 0 100vmax ${c}`).join(', ');
 }
 
 /** La opacidad de un color computado: `rgba(…, a)`, `oklch(… / a)` o sin alfa. */

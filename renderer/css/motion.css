@@ -226,15 +226,16 @@
 }
 
 /* ── Transición de vista ─────────────────────────────────────────────────────
-   Al cambiar de sección la vista entra sobre el eje del flujo. Es la misma
-   gramática que los pasos del pipeline: todo en Onyx avanza hacia la derecha. */
-.ox-view { animation: ox-glide-in var(--ox-t-4) var(--ox-ease) both; }
+   Con la piel de Opal la vista AFLORA: sube apenas hacia la superficie del
+   vidrio y se materializa (donde Onyx avanzaba sobre el eje X). */
+.ox-view { animation: ox-rise-in var(--ox-t-4) var(--ox-ease) both; }
 
 /* Relevo de vistas: un fundido. La vieja pasa a un calco (.ox-main--saliente,
    lo arma el router) en la misma celda que la nueva, encima de ella, y se
-   esfuma. La nueva ya está entera y quieta debajo: el calco es opaco (el fondo
-   de .ox-main), así que la pantalla está tapada en todo momento y lo único que
-   cambia es cuánto se ve de cada una.
+   esfuma. La nueva ya está entera y quieta debajo: el calco es opaco (con la
+   piel de Opal, la niebla de atrás alineada con la de la ventana), así que la
+   pantalla está tapada en todo momento y lo único que cambia es cuánto se ve
+   de cada una.
    No es el relevo de swap(), donde lo nuevo espera su turno: eso sirve para
    dos cosas chicas sobre el mismo fondo. Con dos vistas enteras la pantalla
    bajaba a un tercio de tapada y volvía —con contenido claro, un parpadeo
@@ -257,6 +258,13 @@
    con style.animation, el inline le ganaría a la regla que la hace irse. */
 .ox-view.is-settled { animation: none; }
 .ox-main--saliente { pointer-events: none; z-index: 1; }
+/* Doble clase: shell.css, que carga después, deja .ox-main transparente. Con
+   background-attachment: fixed las capas caen justo donde caen las de
+   .ox-fog, que también ocupa la ventana entera: el calco no se nota. */
+.ox-main.ox-main--saliente {
+  background: var(--ox-sustrato), var(--ox-bg);
+  background-attachment: fixed;
+}
 .ox-main--saliente[data-state='closing'] { animation: ox-desvanecer var(--ox-t-2) var(--ox-ease-both) both; }
 /* Sin `from`: sale desde donde esté, aunque la agarre a mitad de su entrada. */
 @keyframes ox-desvanecer { to { opacity: 0 } }
@@ -296,7 +304,7 @@
 /* In-out y no ease-in: hay alguien esperando detrás. */
 .ox-swap-out[data-state='closing'] { animation: ox-desvanecer 160ms var(--ox-ease-both) both; }
 /* El fundido de un bloque grande (swap con `fundido`): el calco, con el fondo
-   opaco que le pone el JS, va por encima del `th` sticky de la tabla nueva
+   opaco que le pone el JS (la niebla y las hojas que tiene detrás), va por encima del `th` sticky de la tabla nueva
    (z-index 2) y se esfuma en `t-2`. Solo acá: un relevo chico adentro de una
    celda tiene que seguir pasando por DEBAJO del encabezado clavado. */
 .ox-swap-out--fundido { z-index: 3; }

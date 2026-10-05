@@ -63,7 +63,7 @@ let tray = null;
    a mandar ya resuelto apenas carga (win.setBackground en app.js): si cambiás
    el matiz o la temperatura, no hace falta tocar este valor a mano. Este hex
    solo cubre los primeros milisegundos, antes de que exista el renderer. */
-const BG = '#0a0b0d';
+const BG = '#0a0a0a';
 
 const DEFAULT_W = 1280;
 const DEFAULT_H = 820;

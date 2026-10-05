@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   ONYX — superficies y estado
+   OPAL — superficies y estado (en Finway: el de Onyx con la piel de Opal)
    Cards, listas, tablas, tabs, medidores… y el sistema de estado, que es la
    pieza central del diseño.
 
@@ -10,6 +10,11 @@
                                     terminado = se apaga y retrocede.
    El MOVIMIENTO es exclusivo de "corriendo": es lo único que respira.
    El ROJO aparece una sola vez en toda la app: cuando algo falló.
+
+   Y LA REGLA DE LAS HOJAS: nada de lo que hay acá lleva backdrop-filter de
+   fábrica. Una card vive casi siempre ADENTRO de una vista o de un modal, y
+   desenfocar lo ya desenfocado cuesta GPU sin verse. La única excepción es
+   `.ox-card--glass`, para hojas que flotan DIRECTO sobre la niebla.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Marca de estado ──────────────────────────────────────────────────────── */
@@ -106,21 +111,35 @@
 .ox-chip--danger .ox-icon { color: var(--ox-danger); }
 
 /* ── Card / panel ─────────────────────────────────────────────────────────────
-   La jerarquía la construye la ELEVACIÓN, no un borde marcado. El hairline
-   existe para definir el filo, no para separar planos. */
+   Una hoja: relleno de luz, canto iluminado arriba, hairline perimetral y
+   sombra larga. La jerarquía la construye la ELEVACIÓN, no un borde marcado.
+   Sin backdrop-filter de fábrica (la regla de las hojas, arriba).
+   --ox-surface-luz es su luz, para lo que tiene que taparla igual (base.css). */
 .ox-card {
-  --ox-surface: var(--ox-s2);
-  background: var(--ox-surface);
+  --ox-surface-luz: var(--ox-s2);
+  background: var(--ox-surface-luz);
   border-radius: var(--ox-r-lg);
-  box-shadow: var(--ox-hairline), var(--ox-e2);
+  box-shadow: var(--ox-sheet), var(--ox-e2);
   transition: var(--tr-surface);
 }
 .ox-card--interactive:hover {
   background: var(--ox-s3);
-  box-shadow: inset 0 0 0 1px var(--ox-line-2), var(--ox-e3);
+  box-shadow: inset 0 1px 0 var(--ox-edge-lit), inset 0 0 0 1px var(--ox-line-2), var(--ox-e3);
   transform: translateY(-1px);
 }
 .ox-card--interactive:active { transform: translateY(0) scale(.995); }
+
+/* Vidrio de verdad, SOLO para hojas que flotan directo sobre la niebla (una
+   card suelta en la vista, un panel hero). Dos prohibiciones, las dos caras
+   de la misma regla:
+   · No lo anides adentro de otra hoja con blur — desenfocar lo desenfocado
+     cuesta GPU y no cambia un píxel.
+   · No lo metas ADENTRO de un .ox-scroll con esfumado: la máscara del
+     scroller es frontera de backdrop y el vidrio queda CIEGO — computa el
+     blur pero no muestrea nada, y lo de abajo se lee nítido a través. */
+.ox-card--glass {
+  backdrop-filter: var(--ox-glass);
+}
 .ox-card__head {
   display: flex;
   align-items: center;
@@ -172,7 +191,7 @@
   font-weight: var(--ox-w-semi);
   letter-spacing: var(--ox-track-caps);
   text-transform: uppercase;
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
 }
 
 /* Par clave/valor */
@@ -183,7 +202,7 @@
   align-items: baseline;
   font-size: var(--ox-fs-12);
 }
-.ox-kv__k { color: var(--ox-text-4); }
+.ox-kv__k { color: var(--ox-text-3); }
 /* `text-overflow: ellipsis` sin `white-space: nowrap` no hace absolutamente
    nada: la línea envuelve, y lo que igual no entra —una ruta, un id largo— se
    corta al aire contra el borde de la tarjeta. La elipsis estaba declarada
@@ -221,7 +240,7 @@
 /* El anillo va hacia adentro: una lista suele ir de borde a borde de su
    columna, y la columna es un .ox-scroll que recorta. El de base.css sale
    3.5px por fuera y se cortaba contra ese borde (salió en Idiolect, sep 2026). */
-.ox-listitem:focus-visible { box-shadow: inset 0 0 0 1.5px var(--ox-ring); }
+.ox-listitem:focus-visible { outline-offset: -1.5px; }
 .ox-listitem.is-selected { background: var(--ox-wash-2); }
 .ox-listitem.is-selected::before {
   content: '';
@@ -279,13 +298,17 @@
   font-weight: var(--ox-w-semi);
   letter-spacing: var(--ox-track-caps);
   text-transform: uppercase;
-  color: var(--ox-text-4);
-  /* Opaco porque es sticky y las filas pasan por debajo. Del color de la
-     superficie donde cayó la tabla —la vista, una card, un modal— vía
-     --ox-surface, y no de un plano fijo: con --ox-bg a secas, la tabla dentro
-     de una card llevaba el encabezado más oscuro que sus propias filas. */
-  background: var(--ox-surface);
-  box-shadow: inset 0 -1px 0 var(--ox-line);
+  color: var(--ox-text-3);
+  /* Opaco porque es sticky y las filas pasan por debajo, e igual a lo que
+     tiene alrededor: la niebla alineada con la de la ventana (fixed) y, como
+     sombra inset —encima del fondo, debajo del texto—, la luz de la hoja donde
+     cayó la tabla (--ox-surface-luz, base.css). Con un color sólido salía una
+     franja negra sobre el vidrio. El `none` de respaldo es para una tabla
+     fuera de .ox-app (en #ox-layer): sin él la declaración entera se cae y el
+     encabezado queda transparente. */
+  background: var(--ox-sustrato, none), var(--ox-bg);
+  background-attachment: fixed;
+  box-shadow: inset 0 -1px 0 var(--ox-line), inset 0 0 0 100vmax var(--ox-surface-luz, transparent);
   white-space: nowrap;
   user-select: none;
 }
@@ -370,7 +393,7 @@
 .ox-tab__count {
   font-size: var(--ox-fs-10);
   font-variant-numeric: tabular-nums;
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
   padding: 0 4px;
   border-radius: var(--ox-r-xs);
   background: var(--ox-wash-1);
@@ -425,12 +448,12 @@
   font-weight: var(--ox-w-medium);
   letter-spacing: var(--ox-track-caps);
   text-transform: uppercase;
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
 }
 .ox-stat__unit { font-size: var(--ox-fs-12); font-weight: var(--ox-w-regular); color: var(--ox-text-3); }
 
-/* ── Avatar del agente ────────────────────────────────────────────────────────
-   Sin fotos ni emojis: un monograma en mono sobre superficie elevada. */
+/* ── Avatar ───────────────────────────────────────────────────────────────────
+   Sin fotos ni emojis: un monograma en mono sobre una hoja chica. */
 .ox-avatar {
   display: grid;
   place-items: center;
@@ -439,7 +462,7 @@
   flex: 0 0 auto;
   border-radius: var(--ox-r-md);
   background: var(--ox-s3);
-  box-shadow: var(--ox-hairline);
+  box-shadow: var(--ox-sheet);
   font-family: var(--ox-mono);
   font-size: 11px;
   font-weight: var(--ox-w-medium);
@@ -466,7 +489,7 @@
    con ícono adentro se quedaba con estos 34px y salía un botón con lupa gigante. */
 .ox-empty > .ox-icon { width: 34px; height: 34px; color: var(--ox-text-4); stroke-width: 1; }
 .ox-empty__title { font-size: var(--ox-fs-15); font-weight: var(--ox-w-medium); color: var(--ox-text-2); }
-.ox-empty__text { font-size: var(--ox-fs-12); color: var(--ox-text-4); max-width: 320px; line-height: var(--ox-lh-loose); }
+.ox-empty__text { font-size: var(--ox-fs-12); color: var(--ox-text-3); max-width: 320px; line-height: var(--ox-lh-loose); }
 
 /* ── Consola de log ───────────────────────────────────────────────────────── */
 .ox-log {
@@ -477,11 +500,11 @@
   user-select: text;
 }
 .ox-log__line { display: flex; gap: var(--ox-3); padding: 1px 0; animation: ox-fade-in var(--ox-t-2) var(--ox-ease) both; }
-.ox-log__time { color: var(--ox-text-4); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.ox-log__time { color: var(--ox-text-3); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .ox-log__src  { color: var(--ox-text-3); flex: 0 0 auto; min-width: 74px; }
 .ox-log__msg  { min-width: 0; word-break: break-word; }
 .ox-log__line--error .ox-log__msg { color: var(--ox-danger); }
-.ox-log__line--muted .ox-log__msg { color: var(--ox-text-4); }
+.ox-log__line--muted .ox-log__msg { color: var(--ox-text-3); }
 
 /* ── Celda de ícono ───────────────────────────────────────────────────────────
    Para vitrinas y selectores de íconos. El ícono manda y la etiqueta es un

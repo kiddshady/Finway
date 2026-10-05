@@ -447,12 +447,20 @@ app.whenReady().then(async () => {
   const hoyMarcado = await js(`document.querySelectorAll('.fw-dp__day.is-today').length`);
   ok('hoy está marcado una sola vez', hoyMarcado === 1, String(hoyMarcado));
   /* Hoy y el día elegido son el mismo al arrancar: si los dos estilos se
-     pisaran, el amarillo de la selección con la tinta cyan de hoy encima queda
-     ilegible. Gana la selección. */
+     pisaran, el contorno de hoy quedaría encimado al canto del elegido. Gana
+     la selección: la sombra es la del elegido solo (con la piel de Opal, el
+     canto tallado; antes era 'none'), medida sobre una sonda con la misma
+     declaración para no repetir acá el color del token. */
   const hoySel = await js(`(() => { const d = document.querySelector('.fw-dp__day.is-today.is-selected');
-    if (!d) return null; const s = getComputedStyle(d); return { sombra: s.boxShadow }; })()`);
+    if (!d) return null;
+    const sonda = document.createElement('div');
+    sonda.style.boxShadow = 'inset 0 0 0 1px var(--ox-rim-2)';
+    document.body.append(sonda);
+    const esperada = getComputedStyle(sonda).boxShadow;
+    sonda.remove();
+    return { sombra: getComputedStyle(d).boxShadow, esperada }; })()`);
   ok('el día que es hoy Y está elegido no lleva los dos estilos encimados',
-    !hoySel || hoySel.sombra === 'none', JSON.stringify(hoySel));
+    !hoySel || hoySel.sombra === hoySel.esperada, JSON.stringify(hoySel));
   await tap('#qa-dp-field');
   await sleep(500);
   ok('y cierra', !(await js(`!!document.querySelector('.fw-dp__pop')`)));

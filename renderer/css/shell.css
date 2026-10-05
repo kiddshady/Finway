@@ -1,7 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   ONYX — shell
-   El chasis de la ventana: titlebar propia, rail de navegación, área de vista,
-   inspector y statusbar. Todo dibujado por nosotros — nada de frame nativo.
+   OPAL — shell (en Finway: el de Onyx con la piel de Opal)
+   El chasis de la ventana: el sustrato de niebla, la titlebar propia, el rail
+   de navegación, el área de vista, el inspector y la statusbar. Todo dibujado
+   por nosotros — nada de frame nativo.
+
+   El shell es donde vive el vidrio de base: titlebar, rail, inspector y
+   statusbar son HOJAS con backdrop-filter apoyadas directo sobre la niebla.
+   Su fondo es estático, así que ese blur se composita una vez y queda barato.
+   El área de vista es transparente: el contenido flota sobre la niebla misma.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .ox-app {
@@ -9,6 +15,51 @@
   grid-template-rows: var(--ox-titlebar) 1fr var(--ox-statusbar);
   height: 100vh;
   background: var(--ox-bg);
+  /* Contexto de apilado propio: el sustrato vive en z-index:-1 y sin esto se
+     escaparía hacia atrás del body en vez de quedar entre el fondo y la UI. */
+  position: relative;
+  z-index: 0;
+}
+
+/* ── El sustrato ─────────────────────────────────────────────────────────────
+   Lo que el vidrio difumina. En una app acromática este es el problema
+   central: sin color, un backdrop-filter no tiene nada que hacer y la
+   superficie se lee como una capa gris cualquiera. Lo resuelven dos cosas:
+
+     · NIEBLA — manchas de pura luz, sin un grado de tinte. Dan la variación
+       de luminancia que en Onyx ponía la croma. `--ox-fog` las regula.
+     · GRANO — sin él el desenfoque queda plástico; con él parece vidrio.
+
+   Y un VELO oscuro que hunde el conjunto para que el texto gane siempre,
+   caiga donde caiga una mancha: el contraste no puede depender de la niebla.
+
+   Es absolute, no participa del grid, y es UNA capa estática: animarla
+   obligaría a recomponer cada hoja de vidrio en cada frame.
+
+   Las capas viven en --ox-sustrato porque hay otra cosa que las necesita:
+   el calco de la vista que se va (motion.css) es opaco, y lo opaco de una
+   vista transparente es la niebla que tiene detrás. Con
+   background-attachment: fixed, las mismas capas caen exactamente donde caen
+   las de .ox-fog, que también ocupa la ventana entera. */
+.ox-app {
+  --ox-sustrato:
+    /* El grano, arriba de todo el sustrato. */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.038'/%3E%3C/svg%3E"),
+    /* El velo. Parejo a propósito: con un degradé vertical, sobre un fondo
+       tan oscuro cada nivel de 8 bits ocupa cientos de px y los saltos se
+       leen como líneas horizontales que parten la ventana en franjas. */
+    linear-gradient(rgb(8 8 9 / .3), rgb(8 8 9 / .3)),
+    /* La niebla. */
+    radial-gradient(46vw 46vw at 10% 0%, rgb(255 255 255 / calc(.062 * var(--ox-fog))), transparent 70%),
+    radial-gradient(42vw 42vw at 94% 16%, rgb(255 255 255 / calc(.05 * var(--ox-fog))), transparent 70%),
+    radial-gradient(40vw 40vw at 42% 110%, rgb(255 255 255 / calc(.042 * var(--ox-fog))), transparent 70%);
+}
+.ox-fog {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--ox-sustrato);
 }
 
 /* ── Titlebar ──────────────────────────────────────────────────────────────── */
@@ -17,8 +68,11 @@
   align-items: center;
   gap: var(--ox-3);
   padding-left: var(--ox-4);
-  background: var(--ox-bg);
-  box-shadow: inset 0 -1px 0 var(--ox-line);
+  /* Hoja de vidrio: relleno de luz + blur pesado. El filo de arriba es el
+     canto de la ventana y junta luz; el de abajo es un hairline normal. */
+  background: var(--ox-s1);
+  backdrop-filter: var(--ox-glass-heavy);
+  box-shadow: inset 0 1px 0 var(--ox-edge-lit), inset 0 -1px 0 var(--ox-line);
   -webkit-app-region: drag;
   position: relative;
   z-index: 20;
@@ -97,7 +151,7 @@
 .ox-wincontrol:active::before { background: var(--ox-wash-2); }
 .ox-wincontrol--close:hover { color: #fff; }
 .ox-wincontrol--close:hover::before { background: var(--ox-danger-dim); }
-.ox-wincontrol:focus-visible { box-shadow: none; }
+.ox-wincontrol:focus-visible { outline: none; }
 .ox-wincontrol:focus-visible::before { box-shadow: 0 0 0 2px var(--ox-bg), 0 0 0 3.5px var(--ox-ring); }
 .ox-wincontrol .ox-icon { width: 11px; height: 11px; stroke-width: 1.2; }
 
@@ -113,6 +167,7 @@
   display: flex;
   flex-direction: column;
   background: var(--ox-s1);
+  backdrop-filter: var(--ox-glass);
   box-shadow: inset -1px 0 0 var(--ox-line);
   min-height: 0;
 }
@@ -132,7 +187,7 @@
   font-weight: var(--ox-w-semi);
   letter-spacing: var(--ox-track-caps);
   text-transform: uppercase;
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
 }
 
 .ox-navitem {
@@ -159,6 +214,7 @@
   background: var(--ox-wash-2);
   color: var(--ox-text);
   font-weight: var(--ox-w-medium);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .06);
 }
 .ox-navitem.is-active .ox-icon { color: var(--ox-accent); }
 
@@ -183,7 +239,7 @@
   margin-left: auto;
   font-size: var(--ox-fs-11);
   font-variant-numeric: tabular-nums;
-  color: var(--ox-text-4);
+  color: var(--ox-text-3);
   transition: color var(--ox-t-1) var(--ox-ease-soft);
 }
 .ox-navitem:hover .ox-navitem__count,
@@ -195,13 +251,16 @@
   box-shadow: inset 0 1px 0 var(--ox-line);
 }
 
-/* ── Área principal ───────────────────────────────────────────────────────── */
+/* ── Área principal ───────────────────────────────────────────────────────────
+   Transparente: la vista flota directo sobre la niebla. Por eso una card acá
+   adentro puede permitirse ser vidrio de verdad (--glass): es hermana de las
+   hojas del shell, no está adentro de una. */
 .ox-main {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: var(--ox-bg);
+  background: transparent;
 }
 
 .ox-viewhead {
@@ -337,8 +396,9 @@
 .ox-inspector {
   width: var(--ox-inspector);
   flex: 0 0 auto;
-  --ox-surface: var(--ox-s1);
-  background: var(--ox-surface);
+  --ox-surface-luz: var(--ox-s1);
+  background: var(--ox-surface-luz);
+  backdrop-filter: var(--ox-glass);
   box-shadow: inset 1px 0 0 var(--ox-line);
   display: flex;
   flex-direction: column;
@@ -380,6 +440,7 @@
   --ox-plegable-gap: var(--ox-4);   /* el mismo gap, para .ox-plegable--ancho */
   padding: 0 var(--ox-4);
   background: var(--ox-s1);
+  backdrop-filter: var(--ox-glass);
   box-shadow: inset 0 1px 0 var(--ox-line);
   font-size: var(--ox-fs-11);
   color: var(--ox-text-3);
