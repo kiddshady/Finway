@@ -135,10 +135,12 @@ function svg(name, extraClass = '') {
 /**
  * Suma los íconos de tu app al set base. Se llama una vez, al arrancar.
  * Avisa si pisás uno del sistema: casi siempre es un typo, no una intención.
+ * Cuando SÍ es la intención (una app que redibuja el set entero en su estilo,
+ * como los de píxel de Finway), `{ reemplaza: true }` lo dice y no avisa.
  */
-function add(set) {
+function add(set, { reemplaza = false } = {}) {
   for (const [name, body] of Object.entries(set)) {
-    if (P[name]) console.warn(`[Icons] "${name}" ya existía en el set base y fue reemplazado`);
+    if (P[name] && !reemplaza) console.warn(`[Icons] "${name}" ya existía en el set base y fue reemplazado`);
     P[name] = body;
   }
 }

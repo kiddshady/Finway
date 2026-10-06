@@ -1,14 +1,16 @@
 # Finway
 
 ¿A dónde se fue la guita? Registro de gastos e ingresos con análisis de balances.
-Sucesora de **FinWatch** (`C:\tools\FinWatch`), reconstruida desde la plantilla
-[Onyx](C:\tools\Onyx) en septiembre de 2026.
+Sucesora de **FinWatch** (`C:\tools\FinWatch`), nacida de la plantilla
+[Onyx](C:\tools\Onyx) en septiembre de 2026 y rediseñada desde cero como
+**Finway Terminal** en octubre de 2026: una terminal financiera oscura, con la
+letra de las terminales DEC, un acento ámbar de fósforo y un filtro CRT.
 
 ```
 npm start          # abre la app
 npm run dev        # con la consola del renderer en la terminal
-npm test           # 136 checks en node pelado
-npm run smoke      # 115 checks montando el renderer en Electron
+npm test           # 230 checks en node pelado
+npm run smoke      # 88 checks montando el renderer en Electron y usándolo con el teclado
 npm run dist       # arma el instalador: dist/Finway Setup X.Y.Z.exe
 npm run check-dist # verifica que el paquete traiga todo lo que la app pide
 npm run icons      # regenera los PNG, el .ico y la hoja de control
@@ -16,6 +18,10 @@ npm run icons      # regenera los PNG, el .ico y la hoja de control
 
 La app instalada no ve el repo: un cambio le llega por un **Release** (ver
 [Actualizaciones](#actualizaciones)) o reinstalando lo que arma `npm run dist`.
+
+Las maquetas que se aprobaron antes de implementar (el diseño y los íconos) viven
+en `docs/maquetas/`, que **no se versiona**: la del diseño lleva datos reales
+embebidos y el repo es público.
 
 ## Traer los datos de FinWatch
 
@@ -34,21 +40,32 @@ descartan contándolas — un import no se aborta entero por una fila rota, avis
 ## Cómo está partido
 
 ```
-src/store.cjs         escritura atómica, settings, docs y colecciones      ← Onyx
-src/movimientos.cjs   el dominio: alta, edición, respaldo e importación
-src/ipc.cjs           los canales, incluidos los de mov:*                  ← Onyx + dominio
-src/updater.cjs       busca, baja y avisa de una versión nueva             ← nació acá, no está en Onyx
-renderer/css/         tokens, base, shell, controles, superficies, overlays ← Onyx
-renderer/css/finway.css   el par verde/rojo y lo del dominio
-renderer/js/          icons, motion, overlays, router, ui, format          ← Onyx
-renderer/js/update.js el modal de "está lista" y el estado para Ajustes    ← nació acá, no está en Onyx
-renderer/js/fin/      format, categories, stats, charts, trend, quickadd, views, ajustes, calculadora, state, mark
-renderer/js/app.js    lo que une las dos mitades
+src/store.cjs           escritura atómica, settings, docs y colecciones     ← Onyx
+src/movimientos.cjs     el dominio: alta, edición, respaldo e importación
+src/ipc.cjs             los canales, incluidos los de mov:*                 ← Onyx + dominio
+src/updater.cjs         busca, baja y avisa de una versión nueva
+renderer/css/tokens.css     la paleta Terminal (con los nombres --ox-* del motor)
+renderer/css/shell.css      el chasis: titlebar, cinta, escenario, línea de carga, teclas, CRT
+renderer/css/terminal.css   panel, tecla, botón, campo, medidor… y los overlays en idioma Terminal
+renderer/css/finway.css     las seis pantallas
+renderer/css/(base, motion, controls, surfaces, overlays)   ← el motor de Onyx
+renderer/js/(icons, motion, overlays, router, ui, format)   ← el motor de Onyx
+renderer/js/fin/term.js       piezas compartidas: rodar(), relevo(), panel, variación, medidor
+renderer/js/fin/pixeles.js    los íconos de píxel (7×7) que reemplazan a los de Onyx
+renderer/js/fin/mark.js       la F de píxel: titlebar, splash y masters del ícono
+renderer/js/fin/linea.js      el intérprete de la línea de carga (puro, con su test)
+renderer/js/fin/carga.js      la línea de carga cableada
+renderer/js/fin/formulario.js el formulario de un movimiento, en un modal (Ctrl+N, editar)
+renderer/js/fin/pantalla.js   las preferencias del CRT y de la cinta
+renderer/js/fin/(resumen, movimientos, presupuestos, metas, calculadora, ajustes).js   las pantallas
+renderer/js/fin/(state, stats, plan, format, categories, trend, quickadd, mark).js     el dominio
+renderer/js/app.js      lo que une todo: pantallas por tecla, chrome, teclado global, arranque
 ```
 
-Un arreglo en Onyx se trae copiando el archivo de `renderer/js/`, `renderer/css/`
-o `src/store.cjs`. Lo de `fin/` y `movimientos.cjs` es de esta app y no viaja.
-**La paleta de comandos de Onyx no está**: se sacó entera.
+El motor (router, modales, menús, toasts, tooltips, movimiento) sigue siendo el de
+Onyx, y por eso las clases y los tokens del motor conservan el prefijo `ox-`. La
+cara es propia (`fw-`). **No hay paleta de comandos** ni la va a haber: cada
+acción está a la vista o en una tecla documentada.
 
 Dos APIs en el renderer, a propósito: `window.onyx` es la del **framework** y
 significa lo mismo en todas las apps de Onyx; `window.fw` es el **dominio** de
@@ -66,36 +83,28 @@ instancia vieja viva en el tray, con su propia foto de los datos, puede pisar el
 archivo entero al guardar. Releyendo siempre, la mutación de una ventana dormida
 se integra en vez de borrar.
 
-## Color
+## Terminal
 
-Finway es Onyx con dos agregados de color: **verde entra, rojo sale** (solo en
-los gráficos de flujo), y **un color por categoría**. Todo lo demás —el shell,
-las cifras— es acromático, como la plantilla.
-
-**El rojo es `--ox-danger`.** Hubo una etapa con un rojo propio más saturado, para
-que la pérdida "pegara"; desde el 17 sep 2026 la app se quiere más fiel a Onyx y
-perder plata usa la misma tinta que un fallo del sistema. Si Onyx cambia su
-danger, Finway lo sigue sola.
-
-El verde está **emparejado** con ese rojo, y no por el número de croma: en sRGB el
-verde no llega tan lejos como el rojo, así que se iguala la luminancia y el
-**porcentaje del techo de cada matiz** (~57%). Si el danger cambia, la cuenta se
-rehace; el humo mide que sigan pesando igual y que se lean a 11 px.
-
-Cada **categoría tiene su color** (de vuelta desde el 21 sep 2026, tras unos días
-en grises). Es un abanico en OKLCH elegido para maximizar la distancia perceptual
-mínima entre todos los pares, con croma ≤ .14 y lejos del verde y el rojo. Aparece
-donde identifica a la categoría: gajos del donut, líneas de la tendencia, y el
-puntito de chips y filas; nunca en una cifra. El humo mide la distancia mínima en
-Oklab entre categorías y contra el par verde/rojo.
-
-Toda la escalera sale de dos perillas en
-[renderer/css/tokens.css](renderer/css/tokens.css) (`--ox-hue` y `--ox-tint`),
-que no se editan a mano:
-
-```
-node tools/retint.mjs --hue 285 --tint 1.6
-```
+- **Sin rail.** La navegación son las teclas de función de abajo: **F1** Resumen,
+  **F2** Movimientos, **F3** Presupuestos, **F4** Metas, **F5** Calculadora,
+  **F6** Ajustes. La pantalla entera es para los datos.
+- **Paneles numerados** (01, 02…) con la cifra como protagonista.
+- **La cinta de cotizaciones** arriba: balance, ingresos, gastos, drenaje diario y
+  las categorías top, con su variación contra el mes anterior. Se frena con el
+  mouse encima; Ajustes la deja quieta.
+- **Un solo acento: ámbar.** Marca lo activo y lo que se puede tocar. Verde y rojo
+  quedan para lo que entra y lo que sale, y para las variaciones (gastar más es
+  rojo, ganar más es verde). Las categorías tienen su color
+  ([categories.js](renderer/js/fin/categories.js)) y aparecen solo donde
+  identifican una categoría; nunca en una cifra.
+- **Íconos de píxel**: los de adentro están dibujados en la grilla de la letra (7×7,
+  a 14 px o a 7), en [fin/pixeles.js](renderer/js/fin/pixeles.js); reemplazan a los
+  de Onyx con el mismo nombre. Un tamaño que no sea múltiplo de 7 los deja borrosos.
+- **VT323 para todo**, empaquetada (con su licencia OFL en `renderer/fonts/`),
+  escalada con `font-size-adjust` porque su x es baja.
+- **Filtro CRT** (scanlines de 3 px calibradas a los pixeles reales de la
+  pantalla, viñeta y resplandor de fósforo): no / suave / fuerte, en Ajustes.
+- **Nada de vidrio.** Todo opaco; la profundidad la dan los paneles y las sombras.
 
 El color base está duplicado en hex en `main.cjs` y en el splash del
 `index.html` porque Electron no entiende oklch; `npm test` recalcula el hex con
@@ -103,46 +112,63 @@ las mismas matrices que Chromium y falla si divergieron.
 
 ## Uso
 
-- **Tendencia por categoría** (Resumen): gasto mensual de cada categoría en los
-  últimos 6 o 12 meses. Click en un chip prende o apaga su línea, doble click deja
-  solo esa, y el botón del final prende o apaga todas. Hover sobre el gráfico
-  muestra el detalle del mes.
-- **Carga rápida** (inspector de Movimientos): tipo → monto → categoría → Enter.
-  La fecha default es hoy; si cargás en otro mes, salta a verlo. `Ctrl+N` lleva
-  el cursor ahí.
-- **Editar**: doble click en la fila, click derecho → Editar, o el lápiz al pasar
-  el mouse (Esc cancela).
-- **Borrar**: el tacho de la fila o click derecho → Borrar, con confirmación.
-- **Meses**: flechas del encabezado o click en una barra del gráfico de flujo.
-- **Exportar**: el botón de descarga en Movimientos ofrece el CSV del mes (para
-  Excel) o el respaldo completo (para mudarse).
-- **Calculadora**: filas de concepto y monto que se suman al tipear, como un
-  `SUMA()` de planilla. Enter pasa al campo siguiente y, en el último monto, abre
-  una fila nueva. Un monto que no se entiende queda marcado y no suma. Se pueden
-  abrir hasta seis, cada una con su título opcional y su total; «Copiar» deja
-  la tabla en el portapapeles separada por tabs, lista para pegar en una
-  planilla. Se guardan solas en `calculadora.json`, aparte: **no son
-  movimientos** y no tocan el balance.
+- **La línea de carga** (abajo de todo, `/` la enfoca): `gasto 4500 transporte uber`
+  y Enter. Las palabras van en cualquier orden: el tipo (gasto, ingreso, g, i; un
+  `+` delante del monto también es ingreso), el monto (`4.500`, `4500,50`, `12k`),
+  la categoría por su nombre o el principio (`transp`, `educ`), la fecha (`ayer`,
+  `12/9`) y el resto es la nota. Mientras se escribe se ve cómo se entendió cada
+  parte. `↑` con la línea vacía trae la última que se guardó.
+- **El formulario completo** (`Ctrl+N`): tipo, monto, categorías, nota y fecha con
+  su calendario. Es el mismo que se abre al editar.
+- **Movimientos** (F2): el libro del mes con el **saldo corrido**. `↑↓` elige,
+  `E` / doble clic / clic derecho editan, `Supr` borra (con confirmación),
+  `T`/`G`/`I` filtran por tipo, `C` por categoría, `F` escribe en el filtro de
+  texto, `X` exporta (el CSV de lo filtrado, o el respaldo de todo).
+- **Meses**: `←` `→` en Resumen, Movimientos y Presupuestos; `Inicio` vuelve al de
+  hoy; un clic en una columna del panel 05 lleva a ese mes.
+- **Tendencia por categoría**: el panel 03 del Resumen en modo TENDENCIA (6 o 12
+  meses). Click en un chip prende o apaga su línea, doble click deja solo esa.
+- **Presupuestos** (F3): el tope se escribe en la fila. El medidor de bloques
+  muestra lo gastado, la proyección a este ritmo (bloques tenues) y una raya con
+  cuánto del mes ya pasó. El panel *Lectura* lo dice en criollo.
+- **Metas** (F4): aportar y retirar se hace en la ficha, en una línea (monto,
+  nota, Enter). Los aportes **no son movimientos** y no tocan el balance.
+- **Calculadora** (F5): hasta seis hojas de concepto y monto, como un `SUMA()` de
+  planilla. Llenar la última fila abre otra; un monto que no se entiende queda
+  marcado («1 NO SUMA»). `N` abre una hoja nueva. Se guardan en
+  `calculadora.json`, aparte de los movimientos.
 
 ## El ícono
 
-La **F de barras** de la titlebar y el splash, en baldosa: la versión acromática
-de la marca de FinWatch, con la escalera de texto de Onyx resuelta a hex. Reemplazó
-al "desvío" verde/rojo el 17 sep 2026. Su geometría es la de `fin/mark.js`: si se
-toca una, se tocan los cuatro lugares (mark.js, el splash y los dos masters).
+La **F de barras**, de píxel, en baldosa: el stem y tres brazos que se van
+apagando, hechos de bloques de una grilla, con el stem bajando en cuatro
+escalones de ámbar (`--fw-mark-*`: `#F8AC3D`, `#B97F2B`, `#805307`, `#5C3A02`).
+Es la misma F de la titlebar y del splash. Antes fue de barras redondeadas
+acromáticas (Onyx), y antes el "desvío" verde/rojo.
+
+**Una sola fuente:** [renderer/js/fin/mark.js](renderer/js/fin/mark.js) define la
+forma en dos grillas (11 y 16 celdas). De ahí salen la marca de la titlebar, el
+splash del `index.html` (pegado a mano: `node tools/icono.mjs --splash`; `npm test`
+avisa si divergió) y los masters del ícono.
 
 ```
-npm run icons     # regenera los PNG, el .ico y la hoja de control
+npm run icono     # escribe los masters de assets/ desde mark.js (node pelado)
+npm run icons     # los rasteriza: los PNG, el .ico y la hoja de control
 ```
 
-Hay **dos masters** y los dos se mantienen juntos:
+**Un master por tamaño chico** (`icon-16.svg` … `icon-64.svg`) más `icon.svg` para
+128/256/512: la F es pixel art y una celda que no cae en píxeles enteros se ve
+borrosa, así que cada tamaño usa la grilla y la celda que le caen justas (la tabla
+está en `tools/icono.mjs`). Los masters se generan: no se editan a mano.
 
-- [assets/icon.svg](assets/icon.svg) para 32 px y más arriba;
-- [assets/icon-small.svg](assets/icon-small.svg) para 16 y 24, con el mismo dibujo
-  agrandado un 30% dentro de la misma baldosa. La baldosa va al 100% del lienzo
-  —es lo que evita que el ícono se vea más chico que el de al lado en la barra de
-  tareas—, pero a 16 px eso dejaba el glifo en unos 10 píxeles y el tronco en poco
-  más de uno.
+**El CRT**, de 48 px para arriba, es la receta del ícono de NTX en ámbar: la
+baldosa en degradé vertical apenas más claro arriba, scanlines que restan luz solo
+sobre la baldosa, y la F nítida encima con un halo de fósforo. De 128 para arriba
+cada celda va suelta, con una luz finita alrededor: la F se lee como una matriz de
+puntos.
+
+Los masters llevan un comentario adelante: un `--` adentro de un comentario es XML
+inválido, el SVG no carga y `npm run icons` falla (antes se quedaba colgado).
 
 `assets/contacto.png` es la hoja de control: cada tamaño chico ampliado por vecino
 más cercano. **Es la única forma de decidir un ícono** — rasterizado a su tamaño

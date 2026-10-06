@@ -41,7 +41,8 @@ ok('--ox-mono apunta a un token, no a una familia suelta',
 const declaradas = [...css.matchAll(/--ox-mono-([a-z0-9-]+):/g)].map((m) => m[1]);
 const elegida = monoSel?.match(/--ox-mono-([a-z0-9-]+)/)?.[1];
 ok(`la elegida ("${elegida}") está declarada`, declaradas.includes(elegida), declaradas.join(', '));
-ok('hay más de una opción', declaradas.length >= 2, declaradas.join(', '));
+// Terminal tiene una sola familia para todo: VT323 (fonts.css).
+ok('la elegida es VT323', elegida === 'vt' && /VT323/.test(css.match(/--ox-mono-vt:\s*([^;]+)/)?.[1] || ''), String(elegida));
 
 // Un @font-face con la ruta mal puesta NO da error: el navegador cae a la de
 // respaldo y todo parece funcionar. La única defensa es mirar el disco.
@@ -51,12 +52,15 @@ ok('fonts.css declara archivos', urls.length > 0, String(urls.length));
 const faltan = urls.filter((u) => !fs.existsSync(path.join(ROOT, 'renderer', 'css', u)));
 ok('todos los .woff2 referenciados existen', faltan.length === 0, faltan.join(', '));
 
-// Los pesos que declara el CSS tienen que tener su archivo: si falta el 500, el
-// navegador engorda el 400 a mano y en una monoespaciada se nota.
+// VT323 tiene un solo peso. Si el CSS pidiera otro, el navegador engordaría
+// el trazo a mano —en una letra de pixeles se ve sucio—: por eso solo 400, y
+// base.css apaga la síntesis por si algo pide negrita igual.
 const pesos = [...fontsCss.matchAll(/font-weight:\s*(\d+)/g)].map((m) => m[1]);
-ok('declara los pesos 400 y 500', pesos.includes('400') && pesos.includes('500'), [...new Set(pesos)].join(', '));
+ok('declara solo el peso 400', pesos.length > 0 && pesos.every((p) => p === '400'), [...new Set(pesos)].join(', '));
+const base = fs.readFileSync(path.join(ROOT, 'renderer', 'css', 'base.css'), 'utf8');
+ok('base.css apaga la negrita inventada (font-synthesis: none)', /font-synthesis:\s*none/.test(base));
 ok('la licencia viaja con la fuente (OFL lo exige)',
-  fs.existsSync(path.join(ROOT, 'renderer', 'fonts', 'Roboto-Mono-LICENSE.txt')));
+  fs.existsSync(path.join(ROOT, 'renderer', 'fonts', 'VT323-LICENSE.txt')));
 
 console.log('\n3. El hex de main.cjs coincide con --ox-bg');
 const main = fs.readFileSync(path.join(ROOT, 'main.cjs'), 'utf8');

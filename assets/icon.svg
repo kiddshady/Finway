@@ -1,29 +1,21 @@
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     FINWAY — el ícono, master
-     La misma "F" de barras de la titlebar y del splash, acromática: el stem en
-     degradé y tres brazos que se van apagando hacia abajo, con la escalera de
-     texto de Onyx resuelta a hex (acá no hay tokens). Es la versión sin color
-     de la marca de FinWatch. Desde el 17 sep 2026 reemplaza al "desvío"
-     verde/rojo: la app se quiso más fiel a Onyx, y el ícono pasó a ser la marca.
-
-     Las tres reglas de los íconos de Fran, juntas: con baldosa, sin bordes y a
-     sangre (la baldosa al 100% del lienzo, radio 48/256). Glifo al ~58%.
-
-     Geometría = fin/mark.js y el splash de index.html, en su viewBox de 48,
-     escalada y centrada. Si se toca una, se tocan las cuatro.
-     ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- Finway: master de 256 px, generado por tools/icono.mjs desde fin/mark.js. No se edita a mano. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#e9ebee"/>
-      <stop offset="1" stop-color="#6e737b"/>
+    <linearGradient id="tile" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="256">
+      <stop offset="0" stop-color="#17120b"/>
+      <stop offset="1" stop-color="#070605"/>
     </linearGradient>
+    <pattern id="scan" width="256" height="14" patternUnits="userSpaceOnUse" patternTransform="translate(0 9)">
+      <rect y="9" width="256" height="5" fill="#000" opacity=".3"/>
+    </pattern>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="12.60"/>
+    </filter>
+    <clipPath id="clip"><rect width="256" height="256" rx="48"/></clipPath>
+    <g id="f" transform="translate(51 51) scale(14)"><path fill="#F8AC3D" d="M0.06 0.06h0.88v0.88h-0.88zM1.06 0.06h0.88v0.88h-0.88zM0.06 1.06h0.88v0.88h-0.88zM1.06 1.06h0.88v0.88h-0.88zM0.06 2.06h0.88v0.88h-0.88zM1.06 2.06h0.88v0.88h-0.88z"/><path fill="#B97F2B" d="M0.06 3.06h0.88v0.88h-0.88zM1.06 3.06h0.88v0.88h-0.88zM0.06 4.06h0.88v0.88h-0.88zM1.06 4.06h0.88v0.88h-0.88zM0.06 5.06h0.88v0.88h-0.88zM1.06 5.06h0.88v0.88h-0.88z"/><path fill="#805307" d="M0.06 6.06h0.88v0.88h-0.88zM1.06 6.06h0.88v0.88h-0.88zM0.06 7.06h0.88v0.88h-0.88zM1.06 7.06h0.88v0.88h-0.88zM0.06 8.06h0.88v0.88h-0.88zM1.06 8.06h0.88v0.88h-0.88z"/><path fill="#5C3A02" d="M0.06 9.06h0.88v0.88h-0.88zM1.06 9.06h0.88v0.88h-0.88zM0.06 10.06h0.88v0.88h-0.88zM1.06 10.06h0.88v0.88h-0.88z"/><path fill="#F8AC3D" d="M3.06 0.06h0.88v0.88h-0.88zM4.06 0.06h0.88v0.88h-0.88zM5.06 0.06h0.88v0.88h-0.88zM6.06 0.06h0.88v0.88h-0.88zM7.06 0.06h0.88v0.88h-0.88zM8.06 0.06h0.88v0.88h-0.88zM9.06 0.06h0.88v0.88h-0.88zM10.06 0.06h0.88v0.88h-0.88zM3.06 1.06h0.88v0.88h-0.88zM4.06 1.06h0.88v0.88h-0.88zM5.06 1.06h0.88v0.88h-0.88zM6.06 1.06h0.88v0.88h-0.88zM7.06 1.06h0.88v0.88h-0.88zM8.06 1.06h0.88v0.88h-0.88zM9.06 1.06h0.88v0.88h-0.88zM10.06 1.06h0.88v0.88h-0.88z"/><path fill="#B97F2B" d="M3.06 3.06h0.88v0.88h-0.88zM4.06 3.06h0.88v0.88h-0.88zM5.06 3.06h0.88v0.88h-0.88zM6.06 3.06h0.88v0.88h-0.88zM7.06 3.06h0.88v0.88h-0.88zM3.06 4.06h0.88v0.88h-0.88zM4.06 4.06h0.88v0.88h-0.88zM5.06 4.06h0.88v0.88h-0.88zM6.06 4.06h0.88v0.88h-0.88zM7.06 4.06h0.88v0.88h-0.88z"/><path fill="#805307" d="M3.06 6.06h0.88v0.88h-0.88zM4.06 6.06h0.88v0.88h-0.88zM5.06 6.06h0.88v0.88h-0.88zM6.06 6.06h0.88v0.88h-0.88zM7.06 6.06h0.88v0.88h-0.88zM8.06 6.06h0.88v0.88h-0.88zM9.06 6.06h0.88v0.88h-0.88zM3.06 7.06h0.88v0.88h-0.88zM4.06 7.06h0.88v0.88h-0.88zM5.06 7.06h0.88v0.88h-0.88zM6.06 7.06h0.88v0.88h-0.88zM7.06 7.06h0.88v0.88h-0.88zM8.06 7.06h0.88v0.88h-0.88zM9.06 7.06h0.88v0.88h-0.88z"/></g>
   </defs>
-  <rect width="256" height="256" rx="48" fill="#101216"/>
-  <g transform="translate(11.12 9.90) scale(4.87)">
-    <rect x="9" y="9" width="5.5" height="30.5" rx="2.75" fill="url(#g)"/>
-    <rect x="17.3" y="9" width="21.7" height="5.5" rx="2.75" fill="#e9ebee"/>
-    <rect x="17.3" y="17.3" width="14" height="5.5" rx="2.75" fill="#a4a9b0"/>
-    <rect x="17.3" y="25.6" width="18" height="5.5" rx="2.75" fill="#6e737b"/>
-  </g>
+  <rect width="256" height="256" rx="48" fill="url(#tile)"/>
+  <rect width="256" height="256" fill="url(#scan)" clip-path="url(#clip)"/>
+  <use href="#f" filter="url(#glow)" opacity=".55"/>
+  <use href="#f" shape-rendering="crispEdges"/>
 </svg>

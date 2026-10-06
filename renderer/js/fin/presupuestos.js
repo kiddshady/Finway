@@ -1,30 +1,36 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   FINWAY — Presupuestos
-   Un tope mensual por categoría de gasto, y contra él lo que va del mes: cuánto
-   queda, y en el mes en curso, si a este ritmo te pasás y qué día.
+   FINWAY · TERMINAL — F3 Presupuestos
+   Un tope mensual por categoría de gasto, y contra él lo que va del mes:
+   01 el global (presupuestado, gastado, lo que queda y cuánto por día), 02 la
+   tabla de topes con un medidor de bloques por categoría y 03 la «lectura»:
+   lo que una persona diría mirando la tabla, en criollo.
 
-   El tope se escribe en la misma fila, como una celda: no hay modal ni botón de
-   guardar. Vacío es "sin tope". Igual que la calculadora, vive en su propio
-   documento (`presupuestos.json`) y no toca los movimientos.
+   En cada medidor la raya es HOY: cuánto del mes ya pasó. Si el relleno la
+   pasó, se está gastando más rápido que parejo. Los bloques tenues son la
+   proyección: hasta dónde llega a este ritmo.
 
-   El mes es el de toda la app (S.month): el encabezado navega igual que en
-   Resumen y Movimientos.
+   El tope se escribe en la misma fila, como una celda: no hay modal ni botón
+   de guardar, y vacío es «sin tope». Vive en su propio documento
+   (`presupuestos.json`) y no toca los movimientos. Las cuentas son de plan.js.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+import { Icons } from '../icons.js';
 import { Toast } from '../overlays.js';
 import Router from '../router.js';
-import { frase, numero, stagger, swap } from '../motion.js';
-import { esc, head, paint, viewEl } from '../ui.js';
+import { frase } from '../motion.js';
+import { esc, paint, viewEl } from '../ui.js';
 import { catColor, catLabel } from './categories.js';
-import { fmtARS, monthTitle, parseAmount } from './format.js';
-import { monthNavHTML, wireMonthNav } from './views.js';
+import { currentMonth, daysInMonth, parseAmount } from './format.js';
 import { estadoPresupuesto } from './plan.js';
 import { S } from './state.js';
+import { cifra, llenarMedidores, medidor, medir, mesCorto, mesSigla, panel, pct, relevo, rodar } from './term.js';
 
 const DOC = 'presupuestos';
-
 let topes = {};
 let guardadoPendiente = null;
+
+/** Para Ajustes: cuántas categorías tienen tope. */
+export const resumenPresupuestos = () => ({ topes: Object.keys(topes).length });
 
 /** Se llama en el arranque: así la vista pinta de una, sin estado de carga. */
 export async function cargarPresupuestos() {
@@ -38,8 +44,8 @@ export async function cargarPresupuestos() {
   }
 }
 
-/* Con demora, como la calculadora: tipear un tope de seis cifras no son seis
-   escrituras. Al salir de la vista se guarda lo pendiente de una. */
+/* Con demora: tipear un tope de seis cifras no son seis escrituras. Al salir
+   de la vista se guarda lo pendiente de una. */
 function guardarYa() {
   clearTimeout(guardadoPendiente);
   guardadoPendiente = null;
@@ -47,7 +53,6 @@ function guardarYa() {
     Toast.show({ title: 'No se pudo guardar el presupuesto', text: err.message, icon: 'alert' });
   });
 }
-
 function guardarLuego() {
   clearTimeout(guardadoPendiente);
   guardadoPendiente = setTimeout(guardarYa, 400);
@@ -55,95 +60,69 @@ function guardarLuego() {
 
 /* ── Lo que dice cada fila ───────────────────────────────────────────────── */
 
-/** El renglón de abajo de la barra: qué pasa con esta categoría. */
-function detalleDe(f) {
-  if (f.tope == null) {
-    return f.gastado > 0 ? `${fmtARS(f.gastado)} gastado` : 'Sin gastos este mes';
-  }
-  const base = `${fmtARS(f.gastado)} de ${fmtARS(f.tope)}`;
-  if (f.excedido) return `${base} · te pasaste ${fmtARS(-f.queda)}`;
-  if (f.diaExceso) return `${base} · a este ritmo te pasás el día ${f.diaExceso}`;
-  return `${base} · quedan ${fmtARS(f.queda)}`;
+function estadoDe(f, e) {
+  if (f.tope == null) return f.gastado ? ['off', 'SIN TOPE'] : ['off', '—'];
+  if (f.excedido) return ['bad', `PASADO +${pct(f.gastado / f.tope - 1)}`];
+  if (f.diaExceso) return ['warn', `SE PASA EL ${f.diaExceso}`];
+  if (e.ritmo != null && f.pct > e.ritmo + 0.1) return ['warn', 'ADELANTADO'];
+  return ['ok', e.actual ? 'EN RITMO' : 'DENTRO'];
 }
 
-/** El valor que va en el campo: con puntos de miles y sin el $, que ya está
-    dibujado al lado. parseAmount lo lee de vuelta igual. */
 const nfTope = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 });
 const topeTexto = (t) => (t == null ? '' : nfTope.format(t));
+const medidorDe = (f, e) => ({
+  p: f.tope ? Math.min(1, f.pct) : 0,
+  q: f.tope && f.proyeccion ? Math.min(1, f.proyeccion / f.tope) : 0,
+  r: e.ritmo,
+  cls: f.excedido ? 'is-over' : '',
+});
 
-const filaHTML = (f, ritmo) => `
-  <div class="fw-budget__row ox-in-rise${f.tope == null ? ' is-free' : ''}${f.excedido ? ' is-over' : ''}${f.diaExceso ? ' is-warn' : ''}"
-       data-cat="${esc(f.cat)}">
-    <span class="fw-cat fw-budget__cat"><span class="fw-dot" style="background:${catColor(f.cat)}"></span>${esc(catLabel(f.cat))}</span>
-    <div class="fw-budget__state">
-      <div class="ox-meter fw-budget__meter${f.excedido ? ' ox-meter--danger' : ''}">
-        <div class="ox-meter__fill" style="--ox-pct:${pctCSS(f)}"></div>
-        ${ritmo != null ? `<span class="fw-budget__pace" style="left:${(ritmo * 100).toFixed(2)}%"></span>` : ''}
-      </div>
-      <span class="fw-budget__detail ox-copyable">
-        <i data-icon="alert" data-icon-class="fw-budget__warn"></i><span class="fw-budget__text">${esc(detalleDe(f))}</span>
-      </span>
-    </div>
-    <div class="fw-calc__monto fw-budget__tope">
-      <span class="fw-calc__currency">$</span>
-      <input class="ox-input ox-input--mono fw-calc__input" data-tope="${esc(f.cat)}" value="${esc(topeTexto(f.tope))}"
-             placeholder="Sin tope" inputmode="decimal" spellcheck="false" autocomplete="off"
-             aria-label="Tope mensual de ${esc(catLabel(f.cat))}">
-    </div>
-  </div>`;
-
-const pctCSS = (f) => `${f.tope == null ? 0 : Math.min(100, f.pct * 100).toFixed(2)}%`;
-
-/* Los KPIs se identifican por `data-k`: al tipear un tope se les cambia el
-   texto sin repintarlos, que si no la animación de entrada se dispararía en
-   cada tecla. Solo se rearman cuando cambia CUÁLES hay. */
-const kpi = (k, label, value, { sub = '', grande = false } = {}) => `
-  <div class="fw-kpi${grande ? ' fw-kpi--bal' : ''}" data-k="${k}">
-    <div class="ox-stat">
-      <span class="ox-stat__label">${label}</span>
-      <span class="ox-stat__value ox-copyable">${value}</span>
-      <span class="fw-kpi__sub">${sub}</span>
-    </div>
-  </div>`;
-
-function kpisDe(e) {
-  if (!e.presupuestado) return [];
-  const out = [
-    ['pres', 'Presupuestado', fmtARS(e.presupuestado), { sub: e.sinTope ? `${fmtARS(e.sinTope)} en categorías sin tope` : '' }],
-    ['gast', 'Gastado', fmtARS(e.gastado), {}],
-    ['queda', e.queda < 0 ? 'Te pasaste' : 'Queda', fmtARS(Math.abs(e.queda)), { grande: true }],
-  ];
-  if (e.porDia != null) {
-    // Sin centavos y hacia abajo: es un "podés gastar hasta", y redondear para
-    // arriba sería prometer unos pesos que no están.
-    out.push(['dia', 'Por día', fmtARS(Math.floor(e.porDia)),
-      { sub: `para no pasarte, ${e.restantes === 1 ? 'queda hoy' : `quedan ${e.restantes} días`}` }]);
-  }
-  return out;
-}
-
-const INTRO = `<p class="fw-budget__intro">Poné un tope mensual a las categorías que quieras cuidar.
-  El mismo tope vale para todos los meses, y acá ves cuánto te queda de cada uno.</p>`;
-
-const kpisHTML = (e) => {
-  const ks = kpisDe(e);
-  return ks.length ? ks.map(([k, ...r]) => kpi(k, ...r)).join('') : INTRO;
+const filaHTML = (f, e) => {
+  const [c, t] = estadoDe(f, e);
+  return `
+  <tr class="fw-topes__r${f.tope == null ? ' is-free' : ''}" data-cat="${esc(f.cat)}" style="--c:${catColor(f.cat)}">
+    <td><span class="fw-cat"><i></i>${esc(catLabel(f.cat).toUpperCase())}</span></td>
+    <td><input class="fw-fld fw-fld--num fw-topes__in" data-tope="${esc(f.cat)}" value="${esc(topeTexto(f.tope))}"
+               placeholder="sin tope" inputmode="decimal" spellcheck="false" autocomplete="off"
+               aria-label="Tope mensual de ${esc(catLabel(f.cat))}"></td>
+    <td data-c="gas">${f.gastado ? cifra(f.gastado) : '—'}</td>
+    <td data-c="queda" class="${f.queda < 0 ? 'fw-out' : ''}">${f.tope == null ? '—' : cifra(f.queda)}</td>
+    <td class="fw-topes__m">${medidor({ ...medidorDe(f, e), cls: `${medidorDe(f, e).cls}${f.tope == null ? ' is-hidden' : ''}` })}</td>
+    <td><span class="fw-estado fw-estado--${c}" data-c="est">${t}</span></td>
+  </tr>`;
 };
 
-/* Cuando cambia CUÁLES hay (el primer tope, o borrar el último) es un relevo:
-   antes era un innerHTML y la intro y los KPIs se cambiaban de golpe. Con los
-   mismos, cada cifra destella en su lugar y cada frase hace relevo. */
-function actualizarKpis(box, e) {
-  const ks = kpisDe(e);
-  const hay = [...box.querySelectorAll(':scope > [data-k]')].map((el) => el.dataset.k).join();
-  if (!ks.length || hay !== ks.map(([k]) => k).join()) { swap(box, kpisHTML(e), { relevo: true }); return; }
-  for (const [k, label, value, { sub = '' }] of ks) {
-    const el = box.querySelector(`:scope > [data-k="${k}"]`);
-    frase(el.querySelector('.ox-stat__label'), label);
-    numero(el.querySelector('.ox-stat__value'), value);
-    frase(el.querySelector('.fw-kpi__sub'), sub);
+/* ── La lectura ──────────────────────────────────────────────────────────── */
+
+const FLECHA = Icons.svg('chevronRight');
+function lecturaDe(e) {
+  const L = [];
+  const mes = mesSigla(S.month);
+  const nombre = (f) => `<b>${esc(catLabel(f.cat).toUpperCase())}</b>`;
+  if (!e.presupuestado) {
+    L.push('Poné un tope a las categorías que quieras cuidar: escribilo en la columna TOPE. El mismo tope vale para todos los meses.');
+    return L;
   }
+  for (const f of e.filas.filter((x) => x.excedido)) L.push(`${nombre(f)} se pasó del tope por <span class="fw-out">$ ${cifra(-f.queda)}</span>.`);
+  for (const f of e.filas.filter((x) => x.diaExceso)) L.push(`${nombre(f)} va camino a pasarse: a este ritmo llega al tope el <span class="fw-acc">${f.diaExceso} ${mes}</span>.`);
+  if (e.ritmo != null) {
+    for (const f of e.filas.filter((x) => x.tope != null && !x.excedido && !x.diaExceso && x.pct > e.ritmo + 0.1)) {
+      L.push(`${nombre(f)} gastó ${pct(f.pct)} del tope con ${pct(e.ritmo)} del mes andado.`);
+    }
+  }
+  if (e.porDia != null) {
+    L.push(`Para no pasarte del total podés gastar <span class="fw-in">$ ${cifra(Math.floor(e.porDia))}</span> por día (${e.restantes === 1 ? 'queda hoy' : `quedan ${e.restantes} días`}).`);
+  } else if (e.queda < 0) {
+    L.push(`En total te pasaste <span class="fw-out">$ ${cifra(-e.queda)}</span> de lo presupuestado.`);
+  } else if (!e.actual) {
+    L.push(`El mes cerró <span class="fw-in">$ ${cifra(e.queda)}</span> por debajo de lo presupuestado.`);
+  }
+  const sinTope = e.filas.filter((f) => f.tope == null && f.gastado > 0);
+  if (sinTope.length) L.push(`Hay <b>$ ${cifra(e.sinTope)}</b> gastados en ${sinTope.length} ${sinTope.length === 1 ? 'categoría' : 'categorías'} sin tope.`);
+  if (L.length === 0 || (L.length === 1 && e.porDia != null)) L.unshift('Todo en ritmo: ninguna categoría va camino a pasarse.');
+  return L;
 }
+const lecturaHTML = (e) => lecturaDe(e).map((t, i) => `<li style="animation-delay:${i * 60}ms">${FLECHA}<span>${t}</span></li>`).join('');
 
 /* ── Vista ───────────────────────────────────────────────────────────────── */
 
@@ -152,33 +131,35 @@ export function viewPresupuestos() {
   // Las que tienen tope primero: son las que se vienen a mirar. Se ordena al
   // pintar y nunca mientras se tipea, así la fila no se escapa del cursor.
   const filas = [...e.filas.filter((f) => f.tope != null), ...e.filas.filter((f) => f.tope == null)];
-  const n = filas.filter((f) => f.tope != null).length;
 
-  paint(
-    head({
-      title: monthTitle(S.month),
-      sub: n ? `${n} ${n === 1 ? 'categoría' : 'categorías'} con tope` : 'Sin topes todavía',
-      actions: monthNavHTML(),
-      linea: true,
-    })
-    + `<div class="ox-scroll ox-grow">
-         <div class="fw-kpis" id="bg-kpis">${kpisHTML(e)}</div>
-         <section class="ox-card fw-budget">
-           <div class="ox-card__head">
-             <span class="ox-label">Topes por categoría</span>
-             <span class="ox-meta fw-budget__hint">${e.ritmo != null
-               ? 'La marca en cada barra es cuánto del mes ya pasó'
-               : 'El tope es mensual y vale para todos los meses'}</span>
-           </div>
-           <div class="fw-budget__rows" id="bg-rows">${filas.map((f) => filaHTML(f, e.ritmo)).join('')}</div>
-         </section>
-       </div>`,
-  );
+  paint(`
+    <div class="fw-screen fw-pre">
+      ${panel({ n: '01', t: 'Global', m: '', cls: 'fw-pre__glob', attrs: 'id="pre-glob"', body: `
+        <div class="fw-glob ox-copyable">
+          <div><div class="fw-st__k">PRESUPUESTADO</div><div class="fw-st__v" id="g-pres">0</div><div class="fw-st__s" id="g-pres-s"></div></div>
+          <div><div class="fw-st__k">GASTADO</div><div class="fw-st__v" id="g-gas">0</div><div class="fw-st__s"></div></div>
+          <div><div class="fw-st__k" id="g-queda-k">QUEDA</div><div class="fw-st__v" id="g-queda">0</div><div class="fw-st__s"></div></div>
+          <div><div class="fw-st__k">POR DÍA</div><div class="fw-st__v" id="g-dia">—</div><div class="fw-st__s" id="g-dia-s"></div></div>
+          <div class="fw-glob__m">
+            ${medidor({ big: true, r: e.ritmo })}
+            <div class="fw-glob__lbl"><span id="g-pct">—</span><span id="g-now">—</span></div>
+          </div>
+        </div>` })}
+      ${panel({ n: '02', t: 'Topes por categoría', m: 'EL MISMO TOPE VALE TODOS LOS MESES', cls: 'fw-pre__topes', body: `
+        <div class="ox-scroll ox-scroll--line-top ox-scroll--line-bottom fw-scroll">
+          <table class="fw-tbl fw-topes ox-copyable"><thead><tr>
+            <th>CATEGORÍA</th><th>TOPE</th><th>GASTADO</th><th>QUEDA</th><th class="fw-l">CONSUMO</th><th>ESTADO</th>
+          </tr></thead><tbody id="pre-filas">${filas.map((f) => filaHTML(f, e)).join('')}</tbody></table>
+        </div>
+        <div class="fw-hints"><span>${'<span class="fw-key">ENTER</span>'}BAJA AL SIGUIENTE TOPE</span><span>VACÍO = SIN TOPE</span><span><i class="fw-pre__raya"></i>LA RAYA: CUÁNTO DEL MES YA PASÓ</span></div>` })}
+      ${panel({ n: '03', t: 'Lectura', m: '', cls: 'fw-pre__lect', attrs: 'id="pre-lect"', body: `
+        <div class="ox-scroll ox-scroll--line-top ox-scroll--line-bottom fw-scroll"><ul class="fw-lect" id="pre-lect-ul">${lecturaHTML(e)}</ul></div>` })}
+    </div>`);
 
   const root = viewEl();
-  const lista = root.querySelector('#bg-rows');
-  stagger(lista);
-  wireMonthNav(root, () => Router.refresh());
+  pintarGlobal(root, e);
+  llenarMedidores(root);
+  const lista = root.querySelector('#pre-filas');
 
   lista.addEventListener('input', (ev) => {
     const cat = ev.target.dataset.tope;
@@ -193,37 +174,66 @@ export function viewPresupuestos() {
     actualizar(root);
     guardarLuego();
   });
-
-  // Enter baja al tope de la fila siguiente, como en la calculadora.
+  // Enter baja al tope de la fila siguiente, como en una planilla.
   lista.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter' || !ev.target.dataset.tope) return;
     ev.preventDefault();
-    const sig = ev.target.closest('.fw-budget__row').nextElementSibling;
+    const sig = ev.target.closest('tr').nextElementSibling;
     if (sig) sig.querySelector('[data-tope]').focus();
     else ev.target.blur();
   });
-
-  Router.onLeave(() => { if (guardadoPendiente) guardarYa(); });
+  Router.onLeave(() => { if (guardadoPendiente) guardarYa(); clearTimeout(lecturaPendiente); });
 }
 
-/** Al tipear un tope se actualiza lo que depende de él SIN repintar: la barra
-    viaja con su transición y el cursor sigue donde estaba. */
+function pintarGlobal(root, e) {
+  const hay = e.presupuestado > 0;
+  const dias = daysInMonth(S.month);
+  root.querySelector('#pre-glob .fw-p__m').textContent = e.actual
+    ? `${mesCorto(S.month)} · DÍA ${dias - e.restantes + 1} DE ${dias}`
+    : `${mesCorto(S.month)} · ${S.month < currentMonth() ? 'MES CERRADO' : 'TODAVÍA NO EMPEZÓ'}`;
+  rodar(root.querySelector('#g-pres'), e.presupuestado, cifra, 600, 'pre.pres');
+  rodar(root.querySelector('#g-gas'), e.gastado, cifra, 600, 'pre.gas');
+  const queda = root.querySelector('#g-queda');
+  rodar(queda, Math.abs(e.queda), cifra, 600, 'pre.queda');
+  queda.classList.toggle('fw-out', e.queda < 0);
+  frase(root.querySelector('#g-queda-k'), e.queda < 0 ? 'TE PASASTE' : 'QUEDA');
+  const dia = root.querySelector('#g-dia');
+  if (e.porDia != null) rodar(dia, Math.floor(e.porDia), cifra, 600, 'pre.dia');
+  else { dia.dataset.v = 0; dia.textContent = '—'; }
+  frase(root.querySelector('#g-dia-s'), e.porDia != null ? `${e.restantes === 1 ? 'QUEDA HOY' : `QUEDAN ${e.restantes} DÍAS`}` : '');
+  frase(root.querySelector('#g-pres-s'), e.sinTope ? `+ ${cifra(e.sinTope)} SIN TOPE` : '');
+  const m = root.querySelector('.fw-glob .fw-meter');
+  medir(m, { p: hay ? Math.min(1, e.gastado / e.presupuestado) : 0, r: e.ritmo ?? 1, cls: e.gastado > e.presupuestado ? 'is-over' : '' });
+  m.querySelector('.fw-meter__now')?.style.setProperty('opacity', e.ritmo != null ? 1 : 0);
+  frase(root.querySelector('#g-pct'), hay ? `${pct(e.gastado / e.presupuestado)} DEL TOTAL` : 'SIN TOPES TODAVÍA');
+  frase(root.querySelector('#g-now'), e.ritmo != null ? `LA RAYA: ${pct(e.ritmo)} DEL MES` : 'MES CERRADO');
+}
+
+/* Al tipear un tope se pone al día lo que depende de él SIN repintar: los
+   medidores viajan con su transición y el cursor sigue donde estaba. La
+   lectura espera a que se deje de tipear (un relevo por tecla sería ruido). */
+let lecturaPendiente = null;
 function actualizar(root) {
   const e = estadoPresupuesto(S.moves, S.month, topes);
   for (const f of e.filas) {
-    const row = root.querySelector(`.fw-budget__row[data-cat="${CSS.escape(f.cat)}"]`);
+    const row = root.querySelector(`.fw-topes__r[data-cat="${CSS.escape(f.cat)}"]`);
     if (!row) continue;
     row.classList.toggle('is-free', f.tope == null);
-    row.classList.toggle('is-over', f.excedido);
-    row.classList.toggle('is-warn', !!f.diaExceso);
-    row.querySelector('.fw-budget__meter').classList.toggle('ox-meter--danger', f.excedido);
-    row.querySelector('.ox-meter__fill').style.setProperty('--ox-pct', pctCSS(f));
-    // En cada tecla: si cambian solo las cifras destella, si cambia la frase
-    // («quedan» → «te pasaste») hace relevo.
-    frase(row.querySelector('.fw-budget__text'), esc(detalleDe(f)));
+    const q = row.querySelector('[data-c="queda"]');
+    frase(q, f.tope == null ? '—' : cifra(f.queda));
+    q.classList.toggle('fw-out', f.queda < 0);
+    const m = row.querySelector('.fw-meter');
+    m.classList.toggle('is-hidden', f.tope == null);
+    medir(m, medidorDe(f, e));
+    const [c, t] = estadoDe(f, e);
+    const est = row.querySelector('[data-c="est"]');
+    est.className = `fw-estado fw-estado--${c}`;
+    frase(est, t);
   }
-  actualizarKpis(root.querySelector('#bg-kpis'), e);
-  const n = e.filas.filter((f) => f.tope != null).length;
-  frase(root.querySelector('.ox-viewhead__sub'),
-    n ? `${n} ${n === 1 ? 'categoría' : 'categorías'} con tope` : 'Sin topes todavía');
+  pintarGlobal(root, e);
+  clearTimeout(lecturaPendiente);
+  lecturaPendiente = setTimeout(() => {
+    const ul = root.querySelector('#pre-lect-ul');
+    if (ul?.isConnected) relevo(ul, () => { ul.innerHTML = lecturaHTML(estadoPresupuesto(S.moves, S.month, topes)); });
+  }, 600);
 }

@@ -1,0 +1,12 @@
+<!-- Finway: master de 24 px, generado por tools/icono.mjs desde fin/mark.js. No se edita a mano. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <defs>
+    <linearGradient id="tile" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="24">
+      <stop offset="0" stop-color="#17120b"/>
+      <stop offset="1" stop-color="#070605"/>
+    </linearGradient>
+    <g id="f" transform="translate(4 4) scale(1)"><path fill="#F8AC3D" d="M0 0h3v1h-3zM0 1h3v1h-3zM0 2h3v1h-3zM0 3h3v1h-3z"/><path fill="#B97F2B" d="M0 4h3v1h-3zM0 5h3v1h-3zM0 6h3v1h-3zM0 7h3v1h-3z"/><path fill="#805307" d="M0 8h3v1h-3zM0 9h3v1h-3zM0 10h3v1h-3zM0 11h3v1h-3z"/><path fill="#5C3A02" d="M0 12h3v1h-3zM0 13h3v1h-3zM0 14h3v1h-3zM0 15h3v1h-3z"/><path fill="#F8AC3D" d="M4 0h12v1h-12zM4 1h12v1h-12zM4 2h12v1h-12z"/><path fill="#B97F2B" d="M4 4h8v1h-8zM4 5h8v1h-8zM4 6h8v1h-8z"/><path fill="#805307" d="M4 8h10v1h-10zM4 9h10v1h-10zM4 10h10v1h-10z"/></g>
+  </defs>
+  <rect width="24" height="24" rx="4.5" fill="url(#tile)"/>
+  <use href="#f" shape-rendering="crispEdges"/>
+</svg>

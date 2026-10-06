@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   OPAL — base (en Finway: el de Onyx con la piel de Opal)
+   FINWAY · TERMINAL — base (la de Onyx, con la letra de terminal)
    Reset, tipografía y el reemplazo de TODO lo nativo de Chromium:
    scrollbar, selección, focus ring. Nada acá delata que adentro hay un browser.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -30,6 +30,12 @@ html, body {
   overflow: hidden;
   --ox-surface-luz: transparent;
   background: var(--ox-bg);
+  /* VT323 tiene la x baja: se escala a la altura de x de una letra normal
+     (tokens.css → --ox-x-height). Lo heredan todos, campos incluidos (el
+     `font: inherit` de abajo lo trae, porque el shorthand lo incluye). */
+  font-size-adjust: ex-height var(--ox-x-height);
+  /* Un solo peso real: ninguna negrita ni cursiva inventada a mano. */
+  font-synthesis: none;
 }
 
 body {
@@ -38,9 +44,8 @@ body {
   line-height: var(--ox-lh);
   font-weight: var(--ox-w-regular);
   color: var(--ox-text);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  font-feature-settings: 'cv05' 1, 'ss03' 1;   /* Inter: l con cola, a de un piso */
+  letter-spacing: var(--ox-track-normal);
+  font-variant-numeric: tabular-nums;
   /* El chrome no se selecciona (sensación nativa); el CONTENIDO sí — ver abajo. */
   user-select: none;
   cursor: default;

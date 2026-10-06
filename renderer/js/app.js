@@ -1,48 +1,48 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   FINWAY — arranque
-   El shell (titlebar, rail, statusbar, overlays, router) es Onyx tal cual; lo
-   de esta app vive en js/fin/. Acá adentro está solo lo que une las dos
-   mitades: qué vistas hay, qué dice el chrome, y el orden del booteo.
+   FINWAY · TERMINAL — arranque
+   El motor (router, overlays, movimiento) es el de Onyx; la cara es Terminal.
+   Acá adentro está lo que une las dos: qué pantallas hay y en qué tecla, qué
+   dice el chrome (migas, cinta, estado), el teclado global y el booteo.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { Icons } from './icons.js';
-import { Menu, Tooltip } from './overlays.js';
+import { Menu, Modal, Tooltip } from './overlays.js';
 import Router from './router.js';
-import { frase, initClickFlash, initScrollFades, numero, raf2, swap } from './motion.js';
-import { colorToken, empty, paint } from './ui.js';
+import { frase, initClickFlash, initScrollFades, numero, raf2 } from './motion.js';
+import { colorToken, paint } from './ui.js';
 import { relTime } from './format.js';
-import { fmtARS, monthTitle } from './fin/format.js';
+import { catLabel } from './fin/categories.js';
+import { currentMonth, monthLabel, shiftMonth } from './fin/format.js';
 import { markSVG } from './fin/mark.js';
-import { monthTotals } from './fin/stats.js';
+import { byCategory, monthTotals, movesOf } from './fin/stats.js';
 import { loadAll, refresh, S, setOnChrome, setOnSaved } from './fin/state.js';
-import { focusCarga, viewMovimientos, viewResumen } from './fin/views.js';
+import { cifra, variacion } from './fin/term.js';
+import { viewResumen } from './fin/resumen.js';
+import { viewMovimientos } from './fin/movimientos.js';
 import { viewAjustes } from './fin/ajustes.js';
 import { cargarCalculadora, viewCalculadora } from './fin/calculadora.js';
 import { cargarPresupuestos, viewPresupuestos } from './fin/presupuestos.js';
 import { cargarMetas, viewMetas } from './fin/metas.js';
+import { abrirFormulario } from './fin/formulario.js';
+import { cablearLinea } from './fin/carga.js';
+import { cargarPantalla } from './fin/pantalla.js';
+import { cuerpos as cuerposPixel } from './fin/pixeles.js';
 import { initUpdates } from './update.js';
 
-/* El shell es del framework: `window.onyx` significa lo mismo en todas las
-   apps de Onyx. El dominio de esta vive en `window.fw` y lo usan los módulos
-   de fin/, no este archivo. */
 const shell = window.onyx;
 
-/* ══ Íconos del dominio ══════════════════════════════════════════════════════
-   Con Icons.add(), no editando icons.js: así una versión nueva del set base de
-   Onyx se copia encima sin pisar los de acá. Misma receta que el resto —
-   viewBox de 16, contenido entre 1.8 y 14.2, sin fill. */
+/* ══ Íconos ══════════════════════════════════════════════════════════════════
+   Los de píxel (fin/pixeles.js) reemplazan a los del set base con el mismo
+   nombre, y suman el `prompt` de la línea de carga. Con Icons.add(), no
+   editando icons.js: así una versión nueva del set base se copia encima sin
+   pisar los de acá. */
+Icons.add(cuerposPixel(), { reemplaza: true });
 
-Icons.add({
-  chart: '<path d="M2.4 13.6h11.2"/><path d="M5 13.6V8.2"/><path d="M8 13.6V3.8"/><path d="M11 13.6V10"/>',
-  scale: '<path d="M8 3.2v10.4"/><path d="M3.6 5.4h8.8"/><path d="M3.6 5.4 2 9.4h3.2z"/>'
-       + '<path d="M12.4 5.4 10.8 9.4H14z"/><path d="M5.8 13.6h4.4"/>',
-  calc: '<rect x="3.2" y="1.8" width="9.6" height="12.4" rx="1.8"/><path d="M5.6 4.8h4.8"/>'
-      + '<path d="M5.6 8.2h.4M7.8 8.2h.4M10 8.2h.4M5.6 11.2h.4M7.8 11.2h.4M10 11.2h.4"/>',
-  // Un medidor: el arco es el tope, la aguja lo que va del mes.
-  gauge: '<path d="M2 11a6 6 0 0 1 12 0"/><path d="M8 11l2.8-4.2"/><path d="M4.4 13.2h7.2"/>',
-});
+/* ══ Las seis pantallas, una por tecla ═══════════════════════════════════════ */
 
-/* ══ Router ══════════════════════════════════════════════════════════════════ */
+const PANTALLAS = ['resumen', 'movimientos', 'presupuestos', 'metas', 'calculadora', 'ajustes'];
+/* Las que hablan de un mes: en ellas ←/→ lo cambian y las migas lo muestran. */
+const CON_MES = new Set(['resumen', 'movimientos', 'presupuestos']);
 
 Router.define({
   resumen: { view: viewResumen },
@@ -53,47 +53,121 @@ Router.define({
   ajustes: { view: viewAjustes },
 }, document.getElementById('view'));
 
-/* ══ El chrome: todo lo que vive fuera de la vista ═══════════════════════════ */
+/* ══ El chrome ═══════════════════════════════════════════════════════════════
+   Todo lo que vive fuera de la vista y cambia con la app andando: las cifras
+   destellan en su lugar y las frases hacen relevo (numero y frase). */
 
-/* Todo lo de acá cambia con la app andando: los números destellan en su lugar
-   y las frases hacen relevo (numero y frase, en motion.js). Antes eran textContent e innerHTML
-   a secas y cambiaban de un cuadro al otro. */
 function updateChrome() {
+  const nombre = Router.name || 'resumen';
+  const conMes = CON_MES.has(nombre);
+  frase(document.getElementById('crumb-view'), nombre.toUpperCase());
+  document.getElementById('crumb').classList.toggle('is-sin-mes', !conMes);
+  frase(document.getElementById('crumb-mes'), monthLabel(S.month));
+  document.querySelectorAll('.fw-fk__b').forEach((b) => b.classList.toggle('is-active', b.dataset.view === nombre));
+
   const t = monthTotals(S.moves, S.month);
-
-  numero(document.querySelector('[data-view="movimientos"] .ox-navitem__count'), t.count);
-  numero(document.getElementById('stat-count'), t.count);
-
-  /* El balance de la statusbar no se tiñe: como toda cifra de la app, el signo
-     alcanza. (Hasta el 17 sep 2026 tomaba el verde o el rojo del par.) */
-  numero(document.getElementById('stat-balance'), fmtARS(t.balance));
-
-  frase(document.querySelector('#stat-saved .ox-statusbar__value'), S.lastSaved ? relTime(S.lastSaved) : '—');
-
-  /* El mes en la titlebar: las dos vistas hablan del mismo mes, y tenerlo
-     arriba evita la pregunta «¿esto de cuándo es?» al volver de otra ventana.
-     Con el mismo mes, swap() no toca nada. */
-  swap(document.getElementById('titlebar-context'),
-    `${Icons.svg('calendar', 'ox-icon--sm')}<span>${monthTitle(S.month)}</span>`, { relevo: true });
-
-  // El pie del rail: antes se escribía una sola vez al arrancar y quedaba viejo.
-  const pie = document.getElementById('rail-foot');
-  if (pie) {
-    if (!pie.firstElementChild) pie.innerHTML = '<div class="ox-meta"></div>';
-    const n = S.moves.length;
-    frase(pie.firstElementChild, `${n} ${n === 1 ? 'movimiento guardado' : 'movimientos guardados'}`);
-  }
+  numero(document.getElementById('fk-count'), t.count || '');
+  frase(document.getElementById('st-saldo'), `BAL ${cifra(t.balance)}`);
+  frase(document.getElementById('st-saved-v'), S.lastSaved ? `GUARDADO ${relTime(S.lastSaved).toUpperCase()}` : `${S.moves.length} MOV GUARDADOS`);
+  pintarCinta();
 }
 
-/** La marca late cuando algo se guardó: el movimiento ES el acuse de recibo,
-    y no ocupa lugar en pantalla como lo ocuparía un cartel. */
+/* La cinta: las cifras del mes con su variación contra el anterior. Se
+   reescribe solo si cambió lo que dice (un relevo: se apaga, cambia, vuelve);
+   escribirla igual reiniciaría el desplazamiento. */
+let cintaDice = '';
+function pintarCinta() {
+  const ym = S.month;
+  const ant = shiftMonth(ym, -1);
+  const t = monthTotals(S.moves, ym);
+  const p = monthTotals(S.moves, ant);
+  const hayAnt = movesOf(S.moves, ant).length > 0;
+  const prevCat = new Map(byCategory(S.moves, ant).map((c) => [c.cat, c.total]));
+  const d = (a, b, o) => (hayAnt ? variacion(a, b, o) : '');
+  const items = [
+    ['BAL', cifra(t.balance), d(t.balance, p.balance, { subeBien: true })],
+    ['ING', cifra(t.income), d(t.income, p.income, { subeBien: true })],
+    ['GAS', cifra(t.expense), d(t.expense, p.expense)],
+    ['DRENAJE/DÍA', cifra(Math.round(t.rate)), d(t.rate, p.rate)],
+    ...byCategory(S.moves, ym).slice(0, 6).map((c) => [catLabel(c.cat).toUpperCase(), cifra(c.total), d(c.total, prevCat.get(c.cat) || 0)]),
+    ['MOV', String(t.count), ''],
+  ];
+  const html = items.map(([k, v, dd]) =>
+    `<span class="fw-tape__item"><span class="fw-tape__k">${k}</span><span class="fw-tape__v">${v}</span>${dd}</span>`).join('');
+  if (html === cintaDice) return;
+  const primera = !cintaDice;
+  cintaDice = html;
+  const pista = document.getElementById('tape');
+  // Más contenido, más tiempo: la velocidad queda pareja (~60 px/s).
+  const poner = () => {
+    pista.innerHTML = html + html;
+    pista.style.setProperty('--fw-tape-dur', `${Math.max(30, pista.scrollWidth / 2 / 60)}s`);
+  };
+  if (primera) { poner(); return; }
+  pista.classList.add('is-out');
+  setTimeout(() => { poner(); raf2(() => pista.classList.remove('is-out')); }, 170);
+}
+
+/** El reloj de la titlebar: la terminal sabe qué hora es. */
+function reloj() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  document.getElementById('clock').innerHTML = `${p(d.getHours())}:${p(d.getMinutes())}<span>:${p(d.getSeconds())}</span>`;
+}
+
+/** Cuando algo se guarda, la marca late y el punto de GUARDADO destella: el
+    movimiento ES el acuse de recibo. */
 function pulseMark() {
   const mark = document.querySelector('#brand-mark .fw-mark');
-  if (!mark) return;
-  mark.classList.remove('is-active');
-  void mark.offsetWidth;
-  mark.classList.add('is-active');
-  setTimeout(() => mark.classList.remove('is-active'), 1400);
+  const dot = document.getElementById('st-dot');
+  for (const el of [mark, dot]) {
+    if (!el) continue;
+    el.classList.remove('is-active', 'is-pulse');
+    void el.getBoundingClientRect();
+    el.classList.add(el === dot ? 'is-pulse' : 'is-active');
+  }
+  setTimeout(() => mark?.classList.remove('is-active'), 1400);
+}
+
+/* ══ Cambiar de mes ══════════════════════════════════════════════════════════ */
+
+function irAMes(ym) {
+  if (!ym || ym === S.month) return;
+  S.month = ym;
+  updateChrome();
+  Router.refresh();
+}
+
+/* ══ El teclado global ═══════════════════════════════════════════════════════
+   F1–F6 cambian de pantalla siempre, aunque el foco esté en un campo. El resto
+   solo cuando no se está escribiendo, no hay un modal abierto ni un menú. */
+
+function wireTeclado(linea) {
+  document.addEventListener('keydown', (e) => {
+    const fk = /^F([1-6])$/.exec(e.key);
+    if (fk && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      if (Modal.isOpen) return;
+      Menu.close();
+      document.activeElement?.blur?.();
+      Router.go(PANTALLAS[Number(fk[1]) - 1]);
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+      e.preventDefault();
+      if (!Modal.isOpen) abrirFormulario();
+      return;
+    }
+    if (Modal.isOpen || e.ctrlKey || e.altKey || e.metaKey) return;
+    const a = document.activeElement;
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) return;
+    if (document.querySelector('.ox-menu')) return;
+    if (e.key === '/') { e.preventDefault(); linea.enfocar(); return; }
+    if (!CON_MES.has(Router.name)) return;
+    if (e.key === 'ArrowLeft' || e.key === '<') { e.preventDefault(); irAMes(shiftMonth(S.month, -1)); }
+    else if (e.key === 'ArrowRight' || e.key === '>') { e.preventDefault(); irAMes(shiftMonth(S.month, 1)); }
+    else if (e.key === 'Home') { e.preventDefault(); irAMes(currentMonth()); }
+  });
 }
 
 function wireShell() {
@@ -107,40 +181,32 @@ function wireShell() {
     maxBtn.setAttribute('aria-label', isMax ? 'Restaurar' : 'Maximizar');
   });
 
-  document.querySelectorAll('.ox-navitem').forEach((b) =>
+  document.querySelectorAll('.fw-fk__b').forEach((b) =>
     b.addEventListener('click', () => Router.go(b.dataset.view)));
-
-  document.getElementById('btn-new').addEventListener('click', focusCarga);
-
-  document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); focusCarga(); }
-  });
+  // Las flechas de la barra de estado también cambian el mes, con el mouse.
+  const flechas = document.querySelectorAll('#st-mes .fw-key');
+  flechas[0].addEventListener('click', () => CON_MES.has(Router.name) && irAMes(shiftMonth(S.month, -1)));
+  flechas[1].addEventListener('click', () => CON_MES.has(Router.name) && irAMes(shiftMonth(S.month, 1)));
 
   /* Al recuperar el foco, releer del disco: una ventana que durmió en el tray
-     se pone al día sola en vez de mostrar su foto vieja de los datos. Solo si
-     algo cambió: antes se repintaba la vista entera en CADA vuelta del foco
-     —todo volvía a entrar y el cursor saltaba al monto— aunque los datos
-     fueran los mismos. */
+     se pone al día sola. Solo si algo cambió. */
   window.addEventListener('focus', async () => {
     if (!await refresh()) return;
     Router.refresh();
     updateChrome();
   });
 
-  // El "hace un rato" de la statusbar tiene que envejecer solo.
+  setInterval(reloj, 1000);
+  // El "hace un rato" del estado tiene que envejecer solo.
   setInterval(() => {
-    if (S.lastSaved) frase(document.querySelector('#stat-saved .ox-statusbar__value'), relTime(S.lastSaved));
+    if (S.lastSaved) frase(document.getElementById('st-saved-v'), `GUARDADO ${relTime(S.lastSaved).toUpperCase()}`);
   }, 30_000);
 }
 
 /* ══ Color de la ventana ═════════════════════════════════════════════════════
-   --ox-bg está en oklch y Electron solo entiende hex. Se resuelve acá y se lo
-   mandamos al main, así el frame fantasma que pinta el compositor de Windows
-   al restaurar sigue camuflado aunque cambie el matiz en tokens.css.
-
-   La traducción la hace colorToken() con un canvas, NO un regex: desde
-   Chromium 144 el computado de una var en oklch vuelve sin convertir, y
-   parseando el texto la app le manda verde a su propia ventana. */
+   --ox-bg está en oklch y Electron solo entiende hex. Se resuelve con un
+   canvas (colorToken) y se le manda al main: el frame fantasma que pinta
+   Windows al restaurar queda del mismo negro. */
 function syncWindowColor() {
   const hex = colorToken('--ox-bg');
   if (hex) shell.win.setBackground(hex);
@@ -149,37 +215,35 @@ function syncWindowColor() {
 /* ══ Arranque ════════════════════════════════════════════════════════════════ */
 
 async function boot() {
-  document.getElementById('brand-mark').innerHTML = markSVG({ size: 17 });
+  document.getElementById('brand-mark').innerHTML = markSVG({ size: 16 });
   Icons.mount(document);
   Tooltip.init();
   initClickFlash();
   initScrollFades();
+  reloj();
   wireShell();
   syncWindowColor();
   setOnSaved(pulseMark);
   setOnChrome(updateChrome);
   initUpdates();
+  const linea = cablearLinea();
+  wireTeclado(linea);
 
   try {
-    await Promise.all([loadAll(), cargarCalculadora(), cargarPresupuestos(), cargarMetas()]);
+    await Promise.all([loadAll(), cargarCalculadora(), cargarPresupuestos(), cargarMetas(), cargarPantalla()]);
   } catch (err) {
-    // Si los datos no cargan, la app tiene que DECIRLO. Una pantalla vacía sin
-    // explicación es peor que un error feo.
-    paint(empty({ icon: 'alert', title: 'No se pudo iniciar', text: err.message }));
+    // Si los datos no cargan, la app tiene que DECIRLO.
+    paint(`<div class="fw-screen"><div class="fw-empty" style="grid-column:1/-1"><div><b>NO SE PUDO INICIAR</b><p>${err.message}</p></div></div></div>`);
     console.error(err);
     return;
   }
 
-  updateChrome();
   Router.onChange(updateChrome);
-  /* Un menú abierto no sobrevive a un cambio de vista: con el mouse se cierra
-     solo, pero navegando por teclado quedaba flotando sobre una vista que ya
-     no es la suya. */
   Router.onChange(() => Menu.close());
   Router.go('resumen');
+  updateChrome();
 
-  // El splash se va recién cuando ya hay algo pintado debajo. El doble rAF
-  // garantiza que el navegador aplicó los estilos de la vista antes del fade.
+  // El splash se va recién cuando ya hay algo pintado debajo.
   raf2(() => {
     const splash = document.getElementById('boot-splash');
     if (!splash) return;

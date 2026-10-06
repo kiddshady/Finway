@@ -1,5 +1,14 @@
 # Onyx — referencia del sistema
 
+> **Finway, desde octubre de 2026:** esta referencia es la del motor de Onyx, que
+> Finway sigue usando por dentro (router, modales, menús, movimiento). La CARA es
+> Finway Terminal: sus tokens están en `renderer/css/tokens.css` y sus piezas
+> (panel, tecla, medidor de bloques…) en `renderer/css/terminal.css` y
+> `renderer/js/fin/term.js`, documentadas en sus comentarios. Las superficies de
+> Terminal son opacas y no hay `--ox-surface`: la tabla sticky toma
+> `--fw-surface` del panel que la contiene.
+
+
 La versión que se toca está adentro de la app, en **Piezas**. Esto es para
 buscar mientras escribís.
 

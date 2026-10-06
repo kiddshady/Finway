@@ -1,0 +1,12 @@
+<!-- Finway: master de 16 px, generado por tools/icono.mjs desde fin/mark.js. No se edita a mano. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <defs>
+    <linearGradient id="tile" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="16">
+      <stop offset="0" stop-color="#17120b"/>
+      <stop offset="1" stop-color="#070605"/>
+    </linearGradient>
+    <g id="f" transform="translate(3 3) scale(1)"><path fill="#F8AC3D" d="M0 0h2v1h-2zM0 1h2v1h-2zM0 2h2v1h-2z"/><path fill="#B97F2B" d="M0 3h2v1h-2zM0 4h2v1h-2zM0 5h2v1h-2z"/><path fill="#805307" d="M0 6h2v1h-2zM0 7h2v1h-2zM0 8h2v1h-2z"/><path fill="#5C3A02" d="M0 9h2v1h-2zM0 10h2v1h-2z"/><path fill="#F8AC3D" d="M3 0h8v1h-8zM3 1h8v1h-8z"/><path fill="#B97F2B" d="M3 3h5v1h-5zM3 4h5v1h-5z"/><path fill="#805307" d="M3 6h7v1h-7zM3 7h7v1h-7z"/></g>
+  </defs>
+  <rect width="16" height="16" rx="3" fill="url(#tile)"/>
+  <use href="#f" shape-rendering="crispEdges"/>
+</svg>

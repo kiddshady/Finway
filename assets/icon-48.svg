@@ -1,0 +1,21 @@
+<!-- Finway: master de 48 px, generado por tools/icono.mjs desde fin/mark.js. No se edita a mano. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs>
+    <linearGradient id="tile" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="48">
+      <stop offset="0" stop-color="#17120b"/>
+      <stop offset="1" stop-color="#070605"/>
+    </linearGradient>
+    <pattern id="scan" width="48" height="3" patternUnits="userSpaceOnUse" patternTransform="translate(0 2)">
+      <rect y="2" width="48" height="1" fill="#000" opacity=".3"/>
+    </pattern>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.70"/>
+    </filter>
+    <clipPath id="clip"><rect width="48" height="48" rx="9"/></clipPath>
+    <g id="f" transform="translate(8 8) scale(3)"><path fill="#F8AC3D" d="M0 0h2v1h-2zM0 1h2v1h-2zM0 2h2v1h-2z"/><path fill="#B97F2B" d="M0 3h2v1h-2zM0 4h2v1h-2zM0 5h2v1h-2z"/><path fill="#805307" d="M0 6h2v1h-2zM0 7h2v1h-2zM0 8h2v1h-2z"/><path fill="#5C3A02" d="M0 9h2v1h-2zM0 10h2v1h-2z"/><path fill="#F8AC3D" d="M3 0h8v1h-8zM3 1h8v1h-8z"/><path fill="#B97F2B" d="M3 3h5v1h-5zM3 4h5v1h-5z"/><path fill="#805307" d="M3 6h7v1h-7zM3 7h7v1h-7z"/></g>
+  </defs>
+  <rect width="48" height="48" rx="9" fill="url(#tile)"/>
+  <rect width="48" height="48" fill="url(#scan)" clip-path="url(#clip)"/>
+  <use href="#f" filter="url(#glow)" opacity=".55"/>
+  <use href="#f" shape-rendering="crispEdges"/>
+</svg>

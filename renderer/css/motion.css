@@ -262,8 +262,7 @@
    background-attachment: fixed las capas caen justo donde caen las de
    .ox-fog, que también ocupa la ventana entera: el calco no se nota. */
 .ox-main.ox-main--saliente {
-  background: var(--ox-sustrato), var(--ox-bg);
-  background-attachment: fixed;
+  background: var(--ox-bg);
 }
 .ox-main--saliente[data-state='closing'] { animation: ox-desvanecer var(--ox-t-2) var(--ox-ease-both) both; }
 /* Sin `from`: sale desde donde esté, aunque la agarre a mitad de su entrada. */

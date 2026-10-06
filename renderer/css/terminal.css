@@ -1,0 +1,298 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   FINWAY · TERMINAL — componentes
+   Las piezas con las que se arman las seis pantallas, y el idioma Terminal
+   puesto encima de los overlays del motor (modal, menú, tooltip, toast), que
+   siguen siendo los de Onyx por dentro: acá solo cambia cómo se ven.
+   Carga después de controls, surfaces y overlays: gana por orden.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.fw-caps { text-transform: uppercase; letter-spacing: var(--ox-track-caps); }
+.fw-dim { color: var(--ox-text-3); }
+.fw-in { color: var(--fw-in); }
+.fw-out { color: var(--fw-out); }
+.fw-acc { color: var(--ox-accent); }
+
+/* ── Panel ─────────────────────────────────────────────────────────────────────
+   La unidad de la pantalla: un escalón de luz arriba del fondo, un hairline
+   y una sombra larga. La cabecera lleva su número en ámbar (01, 02…), el
+   título en versalitas y, a la derecha, un dato de contexto. */
+.fw-p {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ox-s1);
+  border-radius: var(--ox-r-lg);
+  box-shadow: inset 0 0 0 1px var(--ox-line), var(--ox-e2);
+  overflow: hidden;
+  --fw-surface: var(--ox-s1);
+}
+.fw-p__h {
+  flex: 0 0 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  min-width: 0;
+  background: var(--ox-s2);
+  box-shadow: inset 0 -1px 0 var(--ox-line);
+}
+.fw-p__n { font-size: 12px; color: var(--ox-accent); letter-spacing: .04em; }
+.fw-p__t { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ox-text-2); white-space: nowrap; }
+.fw-p__m { margin-left: auto; min-width: 0; font-size: 11.5px; color: var(--ox-text-3); letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+.fw-p__h > .fw-seg, .fw-p__h > .fw-btn, .fw-p__h > .fw-iconbtn { flex: none; }
+.fw-p__h > .fw-p__m + .fw-seg, .fw-p__h > .fw-p__m + .fw-btn { margin-left: 8px; }
+.fw-p__b { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+
+/* La barra de herramientas de adentro de un panel */
+.fw-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 8px 12px; box-shadow: inset 0 -1px 0 var(--ox-line); min-width: 0; }
+/* La fila de atajos al pie de un panel */
+.fw-hints { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 7px 12px; box-shadow: inset 0 1px 0 var(--ox-line); font-size: 11.5px; letter-spacing: .1em; color: var(--ox-text-3); }
+.fw-hints > span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Lo que scrollea adentro de un panel: el esfumado de arriba va al aire (la
+   cabecera tiene su línea: ahí no) — lo decide .ox-scroll por lado. */
+.fw-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+/* Con .ox-scroll (para que el repintado le devuelva el scroll): arriba está
+   la línea de la cabecera y abajo el borde del panel, así que no lleva
+   esfumado ni el respiro que el esfumado pide (ox-scroll--line-*). */
+.ox-scroll.fw-scroll { padding-top: 0; padding-bottom: 0; }
+
+/* ── Botones ───────────────────────────────────────────────────────────────────
+   Una tecla y lo que hace: `[E] EDITAR`. El primario es el mismo en ámbar. */
+.fw-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 10px 0 5px;
+  border: 0;
+  border-radius: var(--ox-r-sm);
+  background: transparent;
+  font-size: 12.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ox-text-2);
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px var(--ox-line-2);
+  transition: color var(--ox-t-2) var(--ox-ease-soft), background-color var(--ox-t-2) var(--ox-ease-soft),
+              box-shadow var(--ox-t-2) var(--ox-ease-soft), transform var(--ox-t-1) var(--ox-ease-soft), opacity var(--ox-t-2);
+}
+.fw-btn--sin-tecla { padding-left: 10px; }
+.fw-btn .ox-icon { width: 12px; height: 12px; }
+.fw-btn:hover { color: var(--ox-text); background: var(--ox-wash-1); box-shadow: inset 0 0 0 1px var(--ox-accent-line); }
+.fw-btn:active { transform: translateY(1px); }
+.fw-btn--acc { color: var(--ox-accent); box-shadow: inset 0 0 0 1px var(--ox-accent-line); }
+.fw-btn--acc:hover { background: var(--ox-wash-2); }
+.fw-btn--danger:hover { color: var(--fw-out); background: var(--ox-danger-wash); box-shadow: inset 0 0 0 1px var(--ox-danger-ring); }
+.fw-btn:disabled { opacity: .4; pointer-events: none; }
+.fw-btn[data-tip]:disabled { pointer-events: auto; }
+.fw-btn[data-tip]:disabled:hover { background: transparent; color: var(--ox-text-2); box-shadow: inset 0 0 0 1px var(--ox-line-2); }
+.fw-iconbtn {
+  width: 24px; height: 24px;
+  display: inline-grid; place-items: center;
+  border: 0; border-radius: var(--ox-r-sm);
+  background: transparent; color: var(--ox-text-3);
+  transition: color var(--ox-t-1) var(--ox-ease-soft), background-color var(--ox-t-1) var(--ox-ease-soft), opacity var(--ox-t-1);
+}
+.fw-iconbtn .ox-icon { width: 13px; height: 13px; }
+.fw-iconbtn:hover { color: var(--ox-text); background: var(--ox-wash-1); }
+.fw-iconbtn--danger:hover { color: var(--fw-out); background: var(--ox-danger-wash); }
+.fw-iconbtn:disabled { opacity: .35; pointer-events: none; }
+
+/* ── Segmentado ────────────────────────────────────────────────────────────── */
+.fw-seg { display: flex; gap: 2px; padding: 2px; border-radius: 5px; background: var(--ox-sunken); box-shadow: inset 0 0 0 1px var(--ox-line); }
+.fw-seg__o {
+  display: flex; align-items: center; gap: 6px;
+  padding: 2px 9px; border: 0; border-radius: 3px;
+  background: transparent;
+  font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ox-text-3);
+  white-space: nowrap;
+  transition: background-color var(--ox-t-2) var(--ox-ease-soft), color var(--ox-t-2) var(--ox-ease-soft);
+}
+.fw-seg__o:has(.fw-key) { padding-left: 4px; }
+.fw-seg__o .fw-key { min-width: 17px; height: 15px; font-size: 10px; }
+.fw-seg__o:hover { color: var(--ox-text); }
+.fw-seg__o.is-on { background: var(--ox-wash-2); color: var(--ox-accent); }
+.fw-seg__o.is-on .fw-key { background: var(--ox-accent); color: var(--ox-accent-ink); box-shadow: none; }
+
+/* ── Campos ────────────────────────────────────────────────────────────────── */
+.fw-fld {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--ox-r-sm);
+  background: var(--ox-sunken);
+  color: var(--ox-text);
+  font-size: 13.5px;
+  caret-color: var(--ox-accent);
+  box-shadow: inset 0 0 0 1px var(--ox-line);
+  user-select: text;
+  min-width: 0;
+  transition: box-shadow var(--ox-t-2) var(--ox-ease-soft), color var(--ox-t-2), background-color var(--ox-t-2);
+}
+.fw-fld::placeholder { color: var(--ox-text-4); }
+.fw-fld:hover { box-shadow: inset 0 0 0 1px var(--ox-line-2); }
+.fw-fld:focus { background: var(--ox-sunken-2); box-shadow: inset 0 0 0 1px var(--ox-accent-dim), 0 0 0 3px var(--ox-wash-1); }
+.fw-fld:focus-visible { outline: none; }
+.fw-fld.is-invalid { color: var(--fw-out); box-shadow: inset 0 0 0 1px var(--ox-danger-ring); }
+.fw-fld--num { text-align: right; }
+
+/* ── Par clave/valor ───────────────────────────────────────────────────────── */
+.fw-kv { display: grid; grid-template-columns: auto 1fr; column-gap: 14px; margin: 0; font-size: 13px; }
+.fw-kv > * { margin: 0; padding: 6px 0; box-shadow: inset 0 -1px 0 var(--ox-line); min-width: 0; }
+.fw-kv > :nth-last-child(-n+2) { box-shadow: none; }
+.fw-kv dt { color: var(--ox-text-3); font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; display: flex; align-items: center; }
+.fw-kv dd { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Stat: una cifra grande con su rótulo ─────────────────────────────────── */
+.fw-st__k { font-size: 11.5px; letter-spacing: .12em; color: var(--ox-text-3); text-transform: uppercase; }
+.fw-st__v { margin-top: 4px; font-size: var(--ox-fs-26); line-height: 1; white-space: nowrap; }
+.fw-st__s { margin-top: 5px; font-size: 11.5px; color: var(--ox-text-3); letter-spacing: .04em; min-height: 1.2em; }
+
+/* ── Tabla ─────────────────────────────────────────────────────────────────── */
+.fw-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.fw-tbl th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--fw-surface, var(--ox-s1));
+  text-align: right;
+  padding: 8px 10px 6px;
+  font-size: 11px; font-weight: 400; letter-spacing: .12em;
+  color: var(--ox-text-3);
+  box-shadow: inset 0 -1px 0 var(--ox-line);
+  white-space: nowrap;
+}
+.fw-tbl th:first-child { text-align: left; padding-left: 12px; }
+.fw-tbl td { text-align: right; padding: 0 10px; height: 27px; box-shadow: inset 0 -1px 0 var(--ox-line); white-space: nowrap; transition: background-color var(--ox-t-1) var(--ox-ease-soft); }
+.fw-tbl td:first-child { text-align: left; padding-left: 12px; }
+.fw-tbl tbody tr:hover td { background: var(--ox-wash-1); }
+.fw-tbl tbody tr:last-child td { box-shadow: none; }
+.fw-tbl .fw-l { text-align: left; }
+
+/* La categoría: un cuadradito de su color y el nombre en versalitas */
+.fw-cat { display: inline-flex; align-items: center; gap: 8px; letter-spacing: .06em; min-width: 0; }
+.fw-cat > i { width: 7px; height: 7px; border-radius: 1.5px; background: var(--c, var(--ox-text-3)); flex: none; }
+
+/* ── Variación: un triángulo y el porcentaje ──────────────────────────────── */
+.fw-d { display: inline-flex; align-items: center; gap: 3px; }
+.fw-d svg { width: 7px; height: 7px; }
+.fw-d--up { color: var(--fw-out); }
+.fw-d--dn { color: var(--fw-in); }
+.fw-d--good { color: var(--fw-in); }
+.fw-d--bad { color: var(--fw-out); }
+.fw-d--eq { color: var(--ox-text-3); }
+
+/* ── Medidor de bloques ────────────────────────────────────────────────────────
+   Como un VU: bloques de 6 px. El relleno, la proyección (bloques tenues hasta
+   donde llegaría a este ritmo) y la raya de «hoy». Se recortan con clip-path,
+   que transiciona sin remaquetar. */
+.fw-meter { position: relative; height: 10px; min-width: 100px; }
+.fw-meter > i { position: absolute; inset: 0; }
+.fw-meter__bg { background: repeating-linear-gradient(90deg, rgb(255 232 196 / .07) 0 6px, transparent 6px 8px); }
+.fw-meter__proj { background: repeating-linear-gradient(90deg, rgb(var(--ox-accent-rgb) / .3) 0 6px, transparent 6px 8px); clip-path: inset(0 calc((1 - var(--q, 0)) * 100%) 0 0); transition: clip-path 900ms var(--ox-ease); }
+.fw-meter__fill { background: repeating-linear-gradient(90deg, var(--mc, var(--ox-accent)) 0 6px, transparent 6px 8px); clip-path: inset(0 calc((1 - var(--p, 0)) * 100%) 0 0); transition: clip-path 900ms var(--ox-ease); }
+.fw-meter.is-over { --mc: var(--fw-out); }
+.fw-meter.is-ok { --mc: var(--fw-in); }
+.fw-meter > .fw-meter__now { inset: -3px auto -3px calc(var(--r, 0) * 100%); width: 1px; background: var(--ox-text-2); transition: left 900ms var(--ox-ease), opacity var(--ox-t-2); }
+.fw-meter--big { height: 14px; }
+
+/* ── Vacío ─────────────────────────────────────────────────────────────────── */
+.fw-empty { flex: 1; display: grid; place-items: center; padding: 20px; text-align: center; color: var(--ox-text-3); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; animation: ox-fade-in var(--ox-t-3) var(--ox-ease-soft) both; }
+.fw-empty b { display: block; margin-bottom: 8px; font-weight: 400; font-size: 14px; color: var(--ox-accent); }
+.fw-empty p { margin: 0 auto; max-width: 340px; text-transform: none; letter-spacing: .02em; line-height: 1.5; }
+.fw-empty .fw-btn { margin-top: 14px; }
+
+/* La ficha vacía con rayado: «+ NUEVA META», «+ NUEVA HOJA» */
+.fw-nueva {
+  display: grid; place-items: center;
+  border: 0; border-radius: var(--ox-r-lg);
+  background: repeating-linear-gradient(-45deg, transparent 0 9px, rgb(255 232 196 / .025) 9px 10px);
+  box-shadow: inset 0 0 0 1px var(--ox-line-2);
+  font-size: 13px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ox-text-3);
+  transition: color var(--ox-t-2), box-shadow var(--ox-t-2), background-color var(--ox-t-2);
+}
+.fw-nueva:hover { color: var(--ox-accent); background-color: var(--ox-wash-1); box-shadow: inset 0 0 0 1px var(--ox-accent-line); }
+.fw-nueva > span { display: inline-flex; align-items: center; gap: 8px; }
+.fw-nueva .ox-icon { width: 14px; height: 14px; }
+.fw-nueva:disabled { opacity: .4; pointer-events: none; }
+
+/* El relevo en el lugar de un bloque (relevo() en fin/term.js) */
+.fw-swapzone { transition: opacity 160ms var(--ox-ease-both); }
+.fw-swapzone.is-out { opacity: 0; }
+
+/* ══ Los overlays del motor, en idioma Terminal ═══════════════════════════════
+   Opacos, casi rectos, versalitas en los títulos y en el pie. */
+.ox-tooltip {
+  background: var(--ox-s4);
+  border-radius: var(--ox-r-sm);
+  font-size: 12px;
+  letter-spacing: .04em;
+  box-shadow: inset 0 0 0 1px var(--ox-line-2), var(--ox-e3);
+}
+.ox-tooltip__key { color: var(--ox-accent); }
+.ox-menu {
+  background: var(--ox-s3);
+  border-radius: var(--ox-r-md);
+  box-shadow: inset 0 0 0 1px var(--ox-line-2), var(--ox-e4);
+}
+.ox-menuitem { font-size: 13px; letter-spacing: .04em; border-radius: var(--ox-r-xs); }
+.ox-menuitem:hover, .ox-menuitem.is-active { background: var(--ox-wash-2); }
+.ox-menu__label { font-size: 11px; letter-spacing: .14em; color: var(--ox-text-3); }
+/* Sin vidrio: el velo oscurece y nada más. */
+.ox-scrim { background: var(--ox-scrim); backdrop-filter: none; }
+.ox-modal {
+  background: var(--ox-s2);
+  border-radius: var(--ox-r-lg);
+  box-shadow: inset 0 0 0 1px var(--ox-line-2), var(--ox-e4);
+  --fw-surface: var(--ox-s2);
+}
+.ox-modal__head { padding: 14px 16px 10px; box-shadow: inset 0 -1px 0 var(--ox-line); background: var(--ox-s3); }
+.ox-modal__title { font-size: 14px; font-weight: 400; letter-spacing: .14em; text-transform: uppercase; color: var(--ox-text); }
+.ox-modal__sub { font-size: 12.5px; color: var(--ox-text-3); letter-spacing: .02em; }
+.ox-modal__body { padding: 14px 16px; }
+.ox-modal__foot { background: var(--ox-s1); box-shadow: inset 0 1px 0 var(--ox-line); padding: 10px 16px; }
+.ox-toast {
+  background: var(--ox-s3);
+  border-radius: var(--ox-r-md);
+  box-shadow: inset 0 0 0 1px var(--ox-line-2), var(--ox-e4);
+}
+.ox-toast__title { font-size: 13px; font-weight: 400; letter-spacing: .06em; }
+.ox-toast__text { font-size: 12px; }
+.ox-toast > .ox-icon { color: var(--fw-in); }
+.ox-toast--error > .ox-icon { color: var(--fw-out); }
+.ox-toasts { bottom: calc(var(--fw-cmd) + var(--ox-statusbar) + 14px); }
+
+/* Los botones del motor (pie de los modales, acciones de los toasts) */
+.ox-btn {
+  height: 28px;
+  border-radius: var(--ox-r-sm);
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.ox-btn--primary { background: transparent; color: var(--ox-accent); box-shadow: inset 0 0 0 1px var(--ox-accent-dim); }
+.ox-btn--primary:hover { background: var(--ox-wash-2); color: var(--ox-accent); box-shadow: inset 0 0 0 1px var(--ox-accent); }
+.ox-btn--primary:disabled { background: transparent; color: var(--ox-text-4); box-shadow: inset 0 0 0 1px var(--ox-line); }
+.ox-btn--secondary { background: transparent; box-shadow: inset 0 0 0 1px var(--ox-line-2); }
+.ox-btn--secondary:hover { background: var(--ox-wash-1); box-shadow: inset 0 0 0 1px var(--ox-accent-line); }
+.ox-btn--danger-solid { background: transparent; color: var(--fw-out); box-shadow: inset 0 0 0 1px var(--ox-danger-ring); }
+.ox-btn--danger-solid:hover { background: var(--ox-danger-wash); }
+
+/* Los campos del motor que todavía aparecen en formularios de modal */
+.ox-input, .ox-textarea { background: var(--ox-sunken); border-radius: var(--ox-r-sm); font-size: 13.5px; }
+.ox-field__label { font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ox-text-3); }
+.ox-field__hint { font-size: 12px; }
+
+/* ── Los íconos de píxel ───────────────────────────────────────────────────────
+   Son de 7×7 (fin/pixeles.js) y solo se ven nítidos a un múltiplo de 7: a 14 px
+   cada píxel mide 2, el mismo píxel que la VT323; a 7 px, adentro de una tecla
+   o en una línea chica, mide 1. Los tamaños de Onyx (11, 12, 13, 16 px) los
+   dejarían borrosos, así que acá se pisan todos. `:root` sube la especificidad
+   por encima de cualquier `.contenedor .ox-icon` del motor o de las pantallas.
+   El spinner no es de píxel y queda como estaba. */
+:root .ox-icon:has(> .fw-px) { width: 14px; height: 14px; shape-rendering: crispEdges; }
+:root :is(.fw-key, .fw-crumb, .fw-lect li, .fw-hoja__mas, .ox-chip, .ox-stepper__btn, .ox-meta) .ox-icon:has(> .fw-px) { width: 7px; height: 7px; }
+:root .ox-empty > .ox-icon:has(> .fw-px) { width: 28px; height: 28px; }

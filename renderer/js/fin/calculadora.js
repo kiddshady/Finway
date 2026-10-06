@@ -1,24 +1,26 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   FINWAY — Calculadora
+   FINWAY · TERMINAL — F5 Calculadora
    Filas a mano (concepto y monto) y un total que se recalcula al tipear. Es el
    SUMA() de una planilla, nada más: no son movimientos, no tienen fecha ni
    categoría, y no tocan el balance. Por eso vive en su propio documento
    (`calculadora.json`) y no en movimientos.json.
 
-   Puede haber hasta MAX_CALCS abiertas a la vez, cada una con sus filas y su
-   total: sirven para comparar dos cuentas lado a lado sin mezclarlas.
+   Hasta MAX_CALCS hojas a la vez, cada una con sus filas y su total: sirven
+   para comparar dos cuentas lado a lado sin mezclarlas. Al llenar la última
+   fila aparece otra sola; Enter pasa al campo siguiente.
 
    El monto se guarda como TEXTO, tal cual se escribió. Igual que una celda:
    si se guardara el número, "1.500" volvería como "1500" y un monto que no se
-   entendió desaparecería en vez de quedar marcado para corregirlo.
+   entendió desaparecería en vez de quedar marcado («1 NO SUMA»).
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { Icons } from '../icons.js';
 import { Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
-import { exit, frase, numero, stagger } from '../motion.js';
-import { esc, head, paint, viewEl } from '../ui.js';
+import { exit, frase } from '../motion.js';
+import { esc, paint, viewEl } from '../ui.js';
 import { fmtARS, parseAmount } from './format.js';
+import { cifra, rodar } from './term.js';
 
 const DOC = 'calculadora';
 const FILAS_INICIALES = 3;
@@ -28,13 +30,12 @@ let calcs = [];
 let guardadoPendiente = null;
 
 const nuevoId = (p) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-
 const nuevaFila = () => ({ id: nuevoId('f'), concepto: '', monto: '' });
 const vacias = (n) => Array.from({ length: n }, nuevaFila);
 const nuevaCalc = () => ({ id: nuevoId('c'), titulo: '', filas: vacias(FILAS_INICIALES) });
 
-/** El título es opcional: sin él, la calculadora se llama por su lugar. */
-const nombreDe = (c) => c.titulo.trim() || `Calculadora ${calcs.indexOf(c) + 1}`;
+/** El título es opcional: sin él, la hoja se llama por su lugar. */
+const nombreDe = (c) => c.titulo.trim() || `Hoja ${calcs.indexOf(c) + 1}`;
 
 function leerFilas(lista) {
   return (Array.isArray(lista) ? lista : [])
@@ -42,11 +43,13 @@ function leerFilas(lista) {
     .map((f) => ({ id: f.id, concepto: String(f.concepto ?? ''), monto: String(f.monto ?? '') }));
 }
 
+/** Para Ajustes: cuántas hojas y filas cargadas hay guardadas. */
+export const resumenCalculadora = () => ({ hojas: calcs.length, filas: calcs.reduce((a, c) => a + c.filas.filter(filaCargada).length, 0) });
+
 /** Se llama en el arranque: así la vista pinta de una, sin estado de carga. */
 export async function cargarCalculadora() {
   try {
     const doc = await window.onyx.doc.read(DOC, null);
-    // schema 1 tenía una sola calculadora: `{ filas }`. Se lee como la primera.
     const crudas = Array.isArray(doc?.calculadoras) ? doc.calculadoras
       : Array.isArray(doc?.filas) ? [{ id: 'c1', filas: doc.filas }] : [];
     calcs = crudas
@@ -64,7 +67,6 @@ export async function cargarCalculadora() {
 /* ── Guardado ────────────────────────────────────────────────────────────────
    Con demora: tipear un monto de seis cifras no son seis escrituras. Al
    salir de la vista se guarda lo pendiente de una, sin esperar. */
-
 function guardarYa() {
   clearTimeout(guardadoPendiente);
   guardadoPendiente = null;
@@ -72,7 +74,6 @@ function guardarYa() {
     Toast.show({ title: 'No se pudo guardar la calculadora', text: err.message, icon: 'alert' });
   });
 }
-
 function guardarLuego() {
   clearTimeout(guardadoPendiente);
   guardadoPendiente = setTimeout(guardarYa, 400);
@@ -94,7 +95,6 @@ export function sumar(lista) {
     if (m.invalido) invalidas++;
     else if (!m.vacio) { total += m.valor; contadas++; }
   }
-  // Redondeo a centavos: 0,1 + 0,2 no puede dar 0,30000000000000004 en pantalla.
   return { total: Math.round(total * 100) / 100, contadas, invalidas };
 }
 
@@ -107,7 +107,6 @@ export function tablaTexto(lista, titulo = '') {
   const cargadas = lista.filter(filaCargada);
   if (!cargadas.length) return '';
   const linea = (a, b) => `${a}\t${b}`;
-  // fmtARS separa el $ con un espacio fino: afuera de la app se pega uno común.
   const total = fmtARS(sumar(lista).total).replace(/\s/g, ' ');
   return [
     ...(titulo.trim() ? [titulo.trim()] : []),
@@ -120,7 +119,7 @@ export function tablaTexto(lista, titulo = '') {
 async function copiarTabla(calc) {
   const texto = tablaTexto(calc.filas, calc.titulo);
   if (!texto) {
-    Toast.show({ title: 'Nada para copiar', text: 'La calculadora no tiene filas cargadas.', icon: 'copy' });
+    Toast.show({ title: 'Nada para copiar', text: 'La hoja no tiene filas cargadas.', icon: 'copy' });
     return;
   }
   const n = calc.filas.filter(filaCargada).length;
@@ -135,82 +134,52 @@ async function copiarTabla(calc) {
 /* ── Vista ───────────────────────────────────────────────────────────────── */
 
 const filaHTML = (f) => `
-  <div class="fw-calc__row ox-in-rise" data-fila="${esc(f.id)}">
-    <input class="ox-input fw-calc__concepto" data-campo="concepto" value="${esc(f.concepto)}"
-           placeholder="Concepto" spellcheck="false" autocomplete="off">
-    <div class="fw-calc__monto">
-      <span class="fw-calc__currency">$</span>
-      <input class="ox-input ox-input--mono fw-calc__input${leerMonto(f.monto).invalido ? ' is-invalid' : ''}"
-             data-campo="monto" value="${esc(f.monto)}" placeholder="0" inputmode="decimal"
-             spellcheck="false" autocomplete="off">
-    </div>
-    <button class="ox-iconbtn ox-iconbtn--sm fw-calc__del" data-borrar="${esc(f.id)}" data-tip="Borrar fila"
-            aria-label="Borrar fila"><i data-icon="trash"></i></button>
+  <div class="fw-hoja__fila ox-in-rise" data-fila="${esc(f.id)}">
+    <input class="fw-hoja__c" data-campo="concepto" value="${esc(f.concepto)}" placeholder="concepto" spellcheck="false" autocomplete="off">
+    <input class="fw-hoja__m${leerMonto(f.monto).invalido ? ' is-invalid' : ''}" data-campo="monto" value="${esc(f.monto)}"
+           placeholder="0" inputmode="decimal" spellcheck="false" autocomplete="off">
+    <button class="fw-iconbtn fw-iconbtn--danger fw-hoja__del" data-borrar="${esc(f.id)}" data-tip="Borrar fila" aria-label="Borrar fila"><i data-icon="trash"></i></button>
   </div>`;
 
-const calcHTML = (c) => `
-  <div class="ox-card fw-calc ox-in-rise" data-calc="${esc(c.id)}">
-    <div class="fw-calc__head">
-      <input class="fw-calc__titulo" data-titulo value="${esc(c.titulo)}" maxlength="60"
-             aria-label="Título de la calculadora" spellcheck="false" autocomplete="off">
-      <button class="ox-btn ox-btn--ghost ox-btn--sm ox-flashable fw-calc__copiar" data-accion="copiar">
-        <i data-icon="copy"></i> Copiar</button>
-      <button class="ox-btn ox-btn--ghost ox-btn--sm ox-flashable fw-calc__vaciar" data-accion="vaciar">
-        <i data-icon="close"></i> Vaciar</button>
-      <button class="ox-iconbtn ox-iconbtn--sm fw-calc__cerrar" data-accion="cerrar"
-              data-tip="Cerrar calculadora" aria-label="Cerrar calculadora"><i data-icon="close"></i></button>
+const calcHTML = (c, i) => `
+  <section class="fw-p fw-hoja ox-in-rise" data-calc="${esc(c.id)}" style="animation-delay:${i * 50}ms">
+    <div class="fw-p__h">
+      <span class="fw-p__n" data-num>C${i + 1}</span>
+      <input class="fw-hoja__tit" data-titulo value="${esc(c.titulo)}" maxlength="60" aria-label="Título de la hoja" spellcheck="false" autocomplete="off">
+      <span class="fw-p__m" data-n></span>
+      <button class="fw-iconbtn" data-accion="copiar" data-tip="Copiar como tabla" aria-label="Copiar"><i data-icon="copy"></i></button>
+      <button class="fw-iconbtn" data-accion="vaciar" data-tip="Vaciar la hoja" aria-label="Vaciar"><i data-icon="undo"></i></button>
+      <button class="fw-iconbtn fw-iconbtn--danger fw-hoja__cerrar" data-accion="cerrar" data-tip="Cerrar la hoja" aria-label="Cerrar"><i data-icon="close"></i></button>
     </div>
-    <div class="fw-calc__cols ox-meta">
-      <span>Concepto</span><span class="fw-calc__cols-monto">Monto</span><span></span>
+    <div class="fw-p__b">
+      <div class="fw-hoja__filas">${c.filas.map(filaHTML).join('')}</div>
+      <button class="fw-hoja__mas" data-accion="agregar"><i data-icon="plus"></i>FILA</button>
+      <div class="fw-hoja__tot"><span>TOTAL<em data-bad></em></span><b data-tot>0</b></div>
     </div>
-    <div class="fw-calc__rows">${c.filas.map(filaHTML).join('')}</div>
-    <div class="fw-calc__add">
-      <button class="ox-btn ox-btn--ghost ox-btn--sm ox-flashable fw-calc__agregar" data-accion="agregar">
-        <i data-icon="plus"></i> Agregar fila
-      </button>
-      <span class="ox-meta">Enter pasa al campo siguiente</span>
-    </div>
-    <div class="ox-card__foot fw-calc__foot">
-      <div class="fw-calc__foot-text">
-        <span class="fw-calc__label">Total</span>
-        <span class="ox-meta fw-calc__detalle"></span>
-      </div>
-      <span class="fw-calc__total ox-num"></span>
-    </div>
-  </div>`;
+  </section>`;
 
 export function viewCalculadora() {
-  /* Un repintado (al volver el foco a la ventana, Router.refresh) no puede
-     sacarle el cursor a quien está tipeando: se recuerda dónde estaba. */
+  /* Un repintado (al volver el foco a la ventana) no puede sacarle el cursor a
+     quien está tipeando: se recuerda dónde estaba. */
   const activo = document.activeElement;
   const foco = activo?.closest?.('[data-calc]') && (activo.dataset.campo || 'titulo' in activo.dataset)
     ? { calc: activo.closest('[data-calc]').dataset.calc, id: activo.closest('[data-fila]')?.dataset.fila,
       campo: activo.dataset.campo, desde: activo.selectionStart, hasta: activo.selectionEnd }
     : null;
 
-  paint(
-    head({
-      title: 'Calculadora',
-      sub: 'Filas sumadas a mano. No se mezclan con los movimientos',
-      actions: `<button class="ox-btn ox-btn--ghost ox-btn--sm ox-flashable" id="calc-nueva">
-                  <i data-icon="plus"></i> Nueva calculadora</button>`,
-      linea: true,
-    })
-    + `<div class="ox-scroll ox-grow">
-        <div class="fw-calcs" id="calc-grilla">${calcs.map(calcHTML).join('')}</div>
-      </div>`,
-  );
+  paint(`
+    <div class="fw-screen fw-calc" id="calc-grilla">
+      ${calcs.map(calcHTML).join('')}
+      <button class="fw-nueva fw-calc__nueva" id="calc-nueva"><span><i data-icon="plus"></i>NUEVA HOJA <span class="fw-key">N</span></span></button>
+    </div>`);
 
   const root = viewEl();
   const grilla = root.querySelector('#calc-grilla');
-  stagger(grilla);
-  grilla.querySelectorAll('.fw-calc__rows').forEach((l) => stagger(l));
-  for (const c of calcs) actualizarTotal(cardDe(grilla, c.id), c);
+  for (const c of calcs) actualizarTotal(cardDe(grilla, c.id), c, true);
   actualizarCabeceras(root);
 
-  /* Todo va enganchado a nodos que mueren con el pintado, nunca a #view: ahí
-     un listener sobrevive a la navegación y se duplica en cada visita. Una
-     sola delegación en la grilla atiende a todas las calculadoras. */
+  /* Una sola delegación en la grilla atiende a todas las hojas, enganchada a
+     nodos que mueren con el pintado: nunca a #view, donde se duplicaría. */
   const contexto = (e) => {
     const card = e.target.closest('[data-calc]');
     const calc = card && calcs.find((c) => c.id === card.dataset.calc);
@@ -218,23 +187,24 @@ export function viewCalculadora() {
   };
 
   grilla.addEventListener('input', (e) => {
-    const campo = e.target.dataset.campo;
     const ctx = contexto(e);
     if (ctx && 'titulo' in e.target.dataset) {
       ctx.calc.titulo = e.target.value;
       guardarLuego();
       return;
     }
+    const campo = e.target.dataset.campo;
     const fila = ctx?.calc.filas.find((f) => f.id === e.target.closest('[data-fila]')?.dataset.fila);
     if (!campo || !fila) return;
     fila[campo] = e.target.value;
     if (campo === 'monto') e.target.classList.toggle('is-invalid', !!leerMonto(e.target.value).invalido);
+    // Llenar la última fila abre otra debajo, sin tener que pedirla.
+    if (fila === ctx.calc.filas.at(-1) && filaCargada(fila)) agregarFila(ctx.card, ctx.calc, { foco: false });
     actualizarTotal(ctx.card, ctx.calc);
     guardarLuego();
   });
 
   grilla.addEventListener('keydown', (e) => {
-    // Enter en el título baja a la primera fila, como en el resto de la tabla.
     if (e.key === 'Enter' && 'titulo' in e.target.dataset) {
       e.preventDefault();
       e.target.closest('[data-calc]').querySelector('[data-campo="concepto"]')?.focus();
@@ -243,16 +213,14 @@ export function viewCalculadora() {
     if (e.key !== 'Enter' || !e.target.dataset.campo) return;
     e.preventDefault();
     const row = e.target.closest('[data-fila]');
-    if (e.target.dataset.campo === 'concepto') {
-      row.querySelector('[data-campo="monto"]').focus();
-      return;
-    }
+    if (e.target.dataset.campo === 'concepto') { row.querySelector('[data-campo="monto"]').focus(); return; }
     const siguiente = row.nextElementSibling;
     if (siguiente) siguiente.querySelector('[data-campo="concepto"]').focus();
     else { const ctx = contexto(e); if (ctx) agregarFila(ctx.card, ctx.calc); }
   });
 
   grilla.addEventListener('click', (e) => {
+    if (e.target.closest('#calc-nueva')) { abrirCalc(root); return; }
     const ctx = contexto(e);
     if (!ctx) return;
     const borrar = e.target.closest('[data-borrar]');
@@ -264,9 +232,16 @@ export function viewCalculadora() {
     else if (accion === 'cerrar') cerrar(root, ctx.card, ctx.calc);
   });
 
-  root.querySelector('#calc-nueva').addEventListener('click', () => abrirCalc(root));
-
-  Router.onLeave(() => { if (guardadoPendiente) guardarYa(); });
+  // N abre una hoja nueva (cuando no se está escribiendo).
+  const teclas = (e) => {
+    if (Modal.isOpen || e.ctrlKey || e.altKey || e.metaKey || e.key.toLowerCase() !== 'n') return;
+    const a = document.activeElement;
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return;
+    e.preventDefault();
+    abrirCalc(root);
+  };
+  document.addEventListener('keydown', teclas);
+  Router.onLeave(() => { document.removeEventListener('keydown', teclas); if (guardadoPendiente) guardarYa(); });
 
   if (foco) {
     const card = `[data-calc="${CSS.escape(foco.calc)}"]`;
@@ -282,41 +257,41 @@ export function viewCalculadora() {
 
 const cardDe = (grilla, id) => grilla.querySelector(`[data-calc="${CSS.escape(id)}"]`);
 
-/** Sin título, el placeholder la nombra por su lugar; la X solo si hay más de
-    una, y el tope en el botón. */
+/** Los números de las hojas por su lugar, la X solo si hay más de una, y la
+    ficha de «nueva» se va en el tope. */
 function actualizarCabeceras(root) {
   const grilla = root.querySelector('#calc-grilla');
   const vivas = [...grilla.querySelectorAll('[data-calc]:not([data-state="closing"])')];
-  vivas.forEach((card, i) => { card.querySelector('[data-titulo]').placeholder = `Calculadora ${i + 1}`; });
+  vivas.forEach((card, i) => {
+    card.querySelector('[data-titulo]').placeholder = `HOJA ${i + 1}`;
+    card.querySelector('[data-num]').textContent = `C${i + 1}`;
+  });
   grilla.classList.toggle('is-single', calcs.length <= 1);
   const nueva = root.querySelector('#calc-nueva');
   nueva.disabled = calcs.length >= MAX_CALCS;
-  if (nueva.disabled) nueva.dataset.tip = `Hasta ${MAX_CALCS} calculadoras`;
-  else delete nueva.dataset.tip;
+  nueva.classList.toggle('is-gone', calcs.length >= MAX_CALCS);
 }
 
-/* En cada tecla. El total destella en su lugar; el pie, si cambian solo sus
-   cifras destella también, y si cambia la frase (aparece «sin entender») hace
-   relevo. Antes los dos eran un textContent en seco. */
-function actualizarTotal(card, calc) {
-  const { total, contadas, invalidas } = sumar(calc.filas);
-  numero(card.querySelector('.fw-calc__total'), fmtARS(total));
-  const partes = [`${contadas} ${contadas === 1 ? 'monto' : 'montos'}`];
-  if (invalidas) partes.push(`${invalidas} sin entender, no suman`);
-  const detalle = card.querySelector('.fw-calc__detalle');
-  frase(detalle, partes.join(' · '));
-  detalle.classList.toggle('fw-calc__detalle--error', invalidas > 0);
+/* En cada tecla. El total rueda hasta su valor; «N NO SUMA» aparece o se va
+   con un relevo. */
+function actualizarTotal(card, calc, primero = false) {
+  const { total, invalidas } = sumar(calc.filas);
+  rodar(card.querySelector('[data-tot]'), total, (v) => `$ ${cifra(Math.round(v * 100) / 100)}`, primero ? 600 : 350);
+  frase(card.querySelector('[data-bad]'), invalidas ? `${invalidas} NO ${invalidas === 1 ? 'SUMA' : 'SUMAN'}` : '');
+  frase(card.querySelector('[data-n]'), `${calc.filas.filter(filaCargada).length} FILAS`);
 }
 
-function agregarFila(card, calc) {
+function agregarFila(card, calc, { foco = true } = {}) {
   const f = nuevaFila();
   calc.filas.push(f);
-  const lista = card.querySelector('.fw-calc__rows');
+  const lista = card.querySelector('.fw-hoja__filas');
   lista.insertAdjacentHTML('beforeend', filaHTML(f));
   const row = lista.lastElementChild;
   Icons.mount(row);
-  row.querySelector('[data-campo="concepto"]').focus();
-  row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (foco) {
+    row.querySelector('[data-campo="concepto"]').focus();
+    row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
   guardarLuego();
 }
 
@@ -326,7 +301,7 @@ async function borrarFila(card, calc, id) {
   actualizarTotal(card, calc);
   guardarLuego();
   await exit(row, { fallback: 260 });
-  // Nunca queda la tabla sin filas: una calculadora vacía no tiene dónde escribir.
+  // Nunca queda la hoja sin filas: una hoja vacía no tiene dónde escribir.
   if (!calc.filas.length && card.isConnected) agregarFila(card, calc);
 }
 
@@ -335,13 +310,12 @@ function abrirCalc(root) {
   const c = nuevaCalc();
   calcs.push(c);
   const grilla = root.querySelector('#calc-grilla');
-  grilla.insertAdjacentHTML('beforeend', calcHTML(c));
-  const card = grilla.lastElementChild;
+  root.querySelector('#calc-nueva').insertAdjacentHTML('beforebegin', calcHTML(c, calcs.length - 1));
+  const card = cardDe(grilla, c.id);
   Icons.mount(card);
-  actualizarTotal(card, c);
+  actualizarTotal(card, c, true);
   actualizarCabeceras(root);
-  card.querySelector('[data-campo="concepto"]').focus();
-  card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  card.querySelector('[data-titulo]').focus();
   guardarLuego();
 }
 
@@ -350,7 +324,7 @@ async function cerrar(root, card, calc) {
   if (tieneDatos(calc) || calc.titulo.trim()) {
     const ok = await Modal.confirm({
       title: `Cerrar «${nombreDe(calc)}»`,
-      sub: 'Se borran sus filas. Las otras calculadoras y los movimientos no se tocan.',
+      sub: 'Se borran sus filas. Las otras hojas y los movimientos no se tocan.',
       confirmLabel: 'Cerrar',
       danger: true,
     });
@@ -364,7 +338,7 @@ async function cerrar(root, card, calc) {
 }
 
 async function vaciar(calc) {
-  const nombre = calcs.length > 1 || calc.titulo.trim() ? `«${nombreDe(calc)}»` : 'la calculadora';
+  const nombre = calcs.length > 1 || calc.titulo.trim() ? `«${nombreDe(calc)}»` : 'la hoja';
   const ok = await Modal.confirm({
     title: `Vaciar ${nombre}`,
     sub: 'Se borran todas sus filas; el título queda. Los movimientos no se tocan.',

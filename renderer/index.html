@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <meta charset="utf-8">
 <!-- CSP estricta: sin conexiones externas, sin eval. Finway no habla con nadie
      — los datos son un JSON local y no hay una sola llamada de red. -->
@@ -9,10 +10,11 @@
 <link rel="stylesheet" href="./css/tokens.css">
 <link rel="stylesheet" href="./css/base.css">
 <link rel="stylesheet" href="./css/motion.css">
-<link rel="stylesheet" href="./css/shell.css">
 <link rel="stylesheet" href="./css/controls.css">
 <link rel="stylesheet" href="./css/surfaces.css">
 <link rel="stylesheet" href="./css/overlays.css">
+<link rel="stylesheet" href="./css/shell.css">
+<link rel="stylesheet" href="./css/terminal.css">
 <link rel="stylesheet" href="./css/finway.css">
 
 <style>
@@ -26,15 +28,15 @@
     z-index: 9999;
     display: grid;
     place-items: center;
-    background: #0a0a0a;
+    background: #070605;
     transition: opacity .34s cubic-bezier(.16, 1, .3, 1);
   }
-  #boot-splash svg { width: 54px; height: 54px; }
+  #boot-splash svg { width: 48px; height: 48px; filter: drop-shadow(0 0 10px rgb(248 172 61 / .35)); }
   /* La F se ARMA, no aparece: el stem primero y los brazos en cascada hacia
      abajo — el caudal bajando, que es de lo que habla la app. */
   #boot-splash .fm-stem,
-  #boot-splash .fm-arm { transform-origin: 9px 24px; animation: boot-grow .5s cubic-bezier(.16,1,.3,1) both; }
-  #boot-splash .fm-stem { transform-origin: 9px 9px; animation-name: boot-rise; }
+  #boot-splash .fm-arm { transform-origin: 4px 0; animation: boot-grow .5s cubic-bezier(.16,1,.3,1) both; }
+  #boot-splash .fm-stem { transform-origin: 0 0; animation-name: boot-rise; }
   #boot-splash .fm-a1 { animation-delay: .16s; }
   #boot-splash .fm-a2 { animation-delay: .27s; }
   #boot-splash .fm-a3 { animation-delay: .38s; }
@@ -43,37 +45,37 @@
 </style>
 
 <div id="boot-splash">
-  <svg viewBox="0 0 48 48" fill="none">
-    <!-- Los tonos van literales, no en var(): esto pinta ANTES de que cargue
-         tokens.css. Son la escalera de texto de Onyx resuelta a hex, y tienen
-         que seguir a fin/mark.js — si divergen, el arranque pega un salto
-         cuando el splash le pasa la posta a la titlebar. -->
-    <defs>
-      <linearGradient id="fw-boot-g" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#e9ebee"/>
-        <stop offset="1" stop-color="#6e737b"/>
-      </linearGradient>
-    </defs>
-    <rect class="fm-stem" x="9" y="9" width="5.5" height="30.5" rx="2.75" fill="url(#fw-boot-g)"/>
-    <rect class="fm-arm fm-a1" x="17.3" y="9"    width="21.7" height="5.5" rx="2.75" fill="#e9ebee"/>
-    <rect class="fm-arm fm-a2" x="17.3" y="17.3" width="14"   height="5.5" rx="2.75" fill="#a4a9b0"/>
-    <rect class="fm-arm fm-a3" x="17.3" y="25.6" width="18"   height="5.5" rx="2.75" fill="#6e737b"/>
+  <svg viewBox="0 0 16 16" shape-rendering="crispEdges">
+    <!-- La F de píxel de fin/mark.js en su grilla de 16, a 48 px (3 px por
+         celda). Los tonos van literales, no en var(): esto pinta ANTES de que
+         cargue tokens.css. Se regenera con `node tools/icono.mjs --splash` y
+         se pega acá: si diverge de mark.js, el arranque pega un salto cuando
+         el splash le pasa la posta a la titlebar. -->
+    <path class="fm-stem" fill="#f8ac3d" d="M0 0h3v1h-3zM0 1h3v1h-3zM0 2h3v1h-3zM0 3h3v1h-3z"/>
+    <path class="fm-stem" fill="#b97f2b" d="M0 4h3v1h-3zM0 5h3v1h-3zM0 6h3v1h-3zM0 7h3v1h-3z"/>
+    <path class="fm-stem" fill="#805307" d="M0 8h3v1h-3zM0 9h3v1h-3zM0 10h3v1h-3zM0 11h3v1h-3z"/>
+    <path class="fm-stem" fill="#5c3a02" d="M0 12h3v1h-3zM0 13h3v1h-3zM0 14h3v1h-3zM0 15h3v1h-3z"/>
+    <path class="fm-arm fm-a1" fill="#f8ac3d" d="M4 0h12v1h-12zM4 1h12v1h-12zM4 2h12v1h-12z"/>
+    <path class="fm-arm fm-a2" fill="#b97f2b" d="M4 4h8v1h-8zM4 5h8v1h-8zM4 6h8v1h-8z"/>
+    <path class="fm-arm fm-a3" fill="#805307" d="M4 8h10v1h-10zM4 9h10v1h-10zM4 10h10v1h-10z"/>
   </svg>
 </div>
 
 <div class="ox-app">
-  <div class="ox-fog" aria-hidden="true"></div>
 
-  <!-- ── Titlebar propia: acá no hay frame nativo ─────────────────────────── -->
+  <!-- ── Titlebar: la marca, dónde estoy y la hora ─────────────────────────── -->
   <header class="ox-titlebar">
-    <div class="ox-brand ox-no-drag" data-tip="Finway" id="brand">
+    <div class="fw-brand ox-no-drag" id="brand">
       <span class="fw-brand__mark" id="brand-mark"></span>
-      <span class="ox-brand__name">Finway</span>
+      <span class="fw-brand__name">FINWAY</span>
     </div>
-
-    <!-- Contexto de la vista actual: el mes que se está mirando. -->
-    <div class="ox-titlebar__context" id="titlebar-context"></div>
-
+    <div class="fw-crumb" id="crumb">
+      <i data-icon="chevronRight"></i>
+      <span id="crumb-view">RESUMEN</span>
+      <span class="fw-crumb__sep2"><i data-icon="chevronRight"></i></span>
+      <span class="fw-crumb__mes" id="crumb-mes"></span>
+    </div>
+    <span class="fw-clock" id="clock"></span>
     <div class="ox-wincontrols">
       <button class="ox-wincontrol" id="win-min"   aria-label="Minimizar"><i data-icon="winMin"></i></button>
       <button class="ox-wincontrol" id="win-max"   aria-label="Maximizar"><i data-icon="winMax"></i></button>
@@ -81,67 +83,50 @@
     </div>
   </header>
 
+  <!-- ── La cinta: las cifras del mes, pasando ─────────────────────────────── -->
+  <div class="fw-tape" id="tape-box"><div class="fw-tape__track" id="tape"></div></div>
+
+  <!-- ── El escenario: acá monta el router cada pantalla ───────────────────── -->
   <div class="ox-body">
-
-    <!-- ── Rail ──────────────────────────────────────────────────────────── -->
-    <nav class="ox-rail">
-      <div class="ox-rail__top">
-        <button class="ox-btn ox-btn--secondary ox-flashable" id="btn-new" style="width:100%"
-                data-tip="Cargar un movimiento" data-tip-key="Ctrl N">
-          <i data-icon="plus"></i> Nuevo movimiento
-        </button>
-      </div>
-
-      <div class="ox-rail__nav ox-scroll">
-        <div class="ox-rail__group">
-          <button class="ox-navitem" data-view="resumen">
-            <i data-icon="chart"></i> Resumen
-          </button>
-          <button class="ox-navitem" data-view="movimientos">
-            <i data-icon="list"></i> Movimientos <span class="ox-navitem__count"></span>
-          </button>
-          <button class="ox-navitem" data-view="presupuestos">
-            <i data-icon="gauge"></i> Presupuestos
-          </button>
-          <button class="ox-navitem" data-view="metas">
-            <i data-icon="target"></i> Metas
-          </button>
-          <button class="ox-navitem" data-view="calculadora">
-            <i data-icon="calc"></i> Calculadora
-          </button>
-        </div>
-
-        <div class="ox-rail__group">
-          <div class="ox-rail__group-label">Sistema</div>
-          <button class="ox-navitem" data-view="ajustes">
-            <i data-icon="settings"></i> Ajustes
-          </button>
-        </div>
-      </div>
-
-      <div class="ox-rail__foot" id="rail-foot"></div>
-    </nav>
-
-    <!-- ── Vista ─────────────────────────────────────────────────────────── -->
     <main class="ox-main" id="view"></main>
   </div>
 
-  <!-- ── Statusbar ───────────────────────────────────────────────────────── -->
-  <footer class="ox-statusbar">
-    <div class="ox-statusbar__item" data-tip="Movimientos del mes en pantalla" data-tip-side="top">
-      <i data-icon="list"></i> <span class="ox-statusbar__value ox-num" id="stat-count"></span> mov.
-    </div>
-    <div class="ox-statusbar__item" data-tip="Balance del mes en pantalla" data-tip-side="top">
-      <i data-icon="scale"></i> <span class="ox-statusbar__value ox-num" id="stat-balance"></span>
-    </div>
-    <div class="ox-spacer"></div>
-    <div class="ox-statusbar__item" id="stat-saved" data-tip="Último guardado" data-tip-side="top">
-      <i data-icon="save"></i> <span class="ox-statusbar__value">—</span>
-    </div>
-  </footer>
+  <!-- ── La línea de carga: `gasto 4500 transporte uber` y Enter ───────────── -->
+  <div class="fw-cmd">
+    <span class="fw-cmd__p"><i data-icon="prompt"></i>CARGA</span>
+    <input class="fw-cmd__in" id="cmd" spellcheck="false" autocomplete="off"
+           placeholder="gasto 4500 transporte uber" aria-label="Línea de carga">
+    <div class="fw-parse" id="parse"></div>
+    <span class="fw-cmd__hint">
+      <span class="fw-key">ENTER</span> REGISTRA
+      <span class="fw-key">/</span> ENFOCA
+      <span class="fw-key">CTRL N</span> FORMULARIO
+    </span>
+  </div>
+
+  <!-- ── Teclas de función y estado ────────────────────────────────────────── -->
+  <nav class="fw-fk" id="fk">
+    <button class="fw-fk__b" data-view="resumen"><span class="fw-key">F1</span>RESUMEN</button>
+    <button class="fw-fk__b" data-view="movimientos"><span class="fw-key">F2</span>MOVIMIENTOS <span class="fw-fk__n" id="fk-count"></span></button>
+    <button class="fw-fk__b" data-view="presupuestos"><span class="fw-key">F3</span>PRESUPUESTOS</button>
+    <button class="fw-fk__b" data-view="metas"><span class="fw-key">F4</span>METAS</button>
+    <button class="fw-fk__b" data-view="calculadora"><span class="fw-key">F5</span>CALCULADORA</button>
+    <button class="fw-fk__b" data-view="ajustes"><span class="fw-key">F6</span>AJUSTES</button>
+    <span class="fw-fk__sp"></span>
+    <span class="fw-fk__st">
+      <span id="st-mes" data-tip="Mes anterior y siguiente (flechas del teclado)" data-tip-side="top">
+        <span class="fw-key"><i data-icon="chevronLeft"></i></span><span class="fw-key"><i data-icon="chevronRight"></i></span>MES
+      </span>
+      <span id="st-saldo" data-tip="Balance del mes en pantalla" data-tip-side="top"></span>
+      <span id="st-saved" data-tip="Último guardado" data-tip-side="top"><span class="fw-dot-ok" id="st-dot"></span><span id="st-saved-v">GUARDADO</span></span>
+    </span>
+  </nav>
 </div>
 
 <!-- Todos los overlays se portalean acá: fuera del flujo, por encima de todo. -->
 <div id="ox-layer"></div>
+
+<!-- El vidrio del tubo: encima de todo, también de los overlays. -->
+<div class="fw-crt" aria-hidden="true"></div>
 
 <script type="module" src="./js/app.js"></script>

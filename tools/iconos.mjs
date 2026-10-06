@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    FINWAY — generador de íconos
-   Rasteriza `assets/icon.svg` a todos los tamaños, arma el .ico de Windows y
+   Rasteriza los masters de `assets/` (los escribe tools/icono.mjs) a todos los tamaños, arma el .ico de Windows y
    deja una hoja de control para mirar cómo quedó cada uno.
 
        npm run icons
@@ -23,12 +23,14 @@ import { fileURLToPath } from 'url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = path.join(ROOT, 'assets');
 const MASTER = path.join(ASSETS, 'icon.svg');
-/* Los tamaños chicos usan un master con el glifo agrandado dentro de la misma
-   baldosa: a 16 px el dibujo del master grande queda en unos 10 píxeles y el
-   trazo en poco más de uno. Es la misma idea que en Moji — a tamaño de tray la
-   geometría se ajusta al píxel en vez de confiar en el escalado. */
-const MASTER_CHICO = path.join(ASSETS, 'icon-small.svg');
-const HASTA_CHICO = 24;
+/* Los tamaños chicos tienen su propio master (icon-16.svg, icon-24.svg…),
+   dibujado en su grilla de píxeles por tools/icono.mjs: la F es pixel art y
+   una celda que no cae en píxeles enteros se ve borrosa. El que no tiene
+   master propio sale de icon.svg. */
+const masterDe = (lado) => {
+  const propio = path.join(ASSETS, `icon-${lado}.svg`);
+  return fs.existsSync(propio) ? propio : MASTER;
+};
 
 /* 16 y 32 son los que más se ven (tray y barra de tareas); 256 es el que lee
    Nexus y el que muestra Windows en la vista grande. */
@@ -70,8 +72,7 @@ app.whenReady().then(async () => {
     app.exit(1);
     return;
   }
-  const svg = fs.readFileSync(MASTER, 'utf8');
-  const svgChico = fs.existsSync(MASTER_CHICO) ? fs.readFileSync(MASTER_CHICO, 'utf8') : svg;
+  const fuentes = Object.fromEntries(TAMANOS.map((l) => [l, fs.readFileSync(masterDe(l), 'utf8')]));
 
   const win = new BrowserWindow({ width: 600, height: 400, show: false });
   await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent('<meta charset="utf-8"><body>'));
@@ -83,17 +84,16 @@ app.whenReady().then(async () => {
       const cargar = (texto) => new Promise((ok, mal) => {
         const i = new Image();
         i.onload = () => ok(i);
-        i.onerror = mal;
+        i.onerror = () => mal(new Error('el SVG no carga (¿XML inválido?)'));
         i.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(texto);
       });
-      const grande = await cargar(${JSON.stringify(svg)});
-      const chico  = await cargar(${JSON.stringify(svgChico)});
+      const fuentes = ${JSON.stringify(fuentes)};
       const salida = {};
       for (const lado of ${JSON.stringify(TAMANOS)}) {
         const cv = document.createElement('canvas');
         cv.width = cv.height = lado;
         const cx = cv.getContext('2d');
-        cx.drawImage(lado <= ${HASTA_CHICO} ? chico : grande, 0, 0, lado, lado);
+        cx.drawImage(await cargar(fuentes[lado]), 0, 0, lado, lado);
         salida[lado] = cv.toDataURL('image/png');
       }
       return salida;
@@ -153,4 +153,9 @@ app.whenReady().then(async () => {
   console.log(`  contacto.png   hoja de control con los tamaños chicos`);
 
   app.exit(0);
+}).catch((err) => {
+  /* Sin esto, un master que no carga (un `--` en su comentario alcanza: es XML
+     inválido) deja la promesa rechazada y Electron abierto para siempre. */
+  console.error('No se pudo rasterizar:', err?.message || err?.type || err);
+  app.exit(1);
 });

@@ -301,11 +301,14 @@ function wireDatePicker(qa) {
       close();
     }
   };
+  /* En la ventana y en captura, antes que nadie: el formulario puede vivir
+     adentro de un modal, y el modal también escucha Esc (en el documento).
+     Con el calendario abierto, Esc cierra el calendario y nada más. */
   const onEsc = (e) => {
-    if (e.key === 'Escape' && pop) { e.stopPropagation(); close(); }
+    if (e.key === 'Escape' && pop) { e.stopImmediatePropagation(); e.preventDefault(); close(); }
   };
   layer().addEventListener('click', onLayerClick);
-  document.addEventListener('keydown', onEsc, true);
+  window.addEventListener('keydown', onEsc, true);
   cerrarCalendario = close;
 
   /* Si el inspector se repinta con el calendario abierto (cambio de tipo,
@@ -314,7 +317,7 @@ function wireDatePicker(qa) {
   return () => {
     close();
     layer().removeEventListener('click', onLayerClick);
-    document.removeEventListener('keydown', onEsc, true);
+    window.removeEventListener('keydown', onEsc, true);
   };
 }
 

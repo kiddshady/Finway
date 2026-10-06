@@ -10,3 +10,6 @@ data/
 
 # Capturas de tools/capturas.cjs
 .shots/
+
+# Las maquetas del diseño: llevan datos reales embebidos y el repo es público.
+docs/maquetas/

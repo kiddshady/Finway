@@ -1,21 +1,20 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Humo del renderer: monta la app de verdad y la recorre.
+   Humo del renderer: monta la app de verdad y la recorre, como la usa una
+   persona: con las teclas de función, la línea de carga y el mouse.
 
    Se corre con `npm run smoke` (necesita Electron, por eso no está en el
    `npm test`, que es node pelado).
 
-   Lo que busca es lo que un test de unidad NO ve: overlays que aterrizan fuera
-   de pantalla, vistas que no montan, gráficos que existen pero salen sin
-   geometría, glifos unicode que se colaron. La regla que lo guía: **medí dónde
-   CAE una cosa, no solo si existe**. El bug más caro de este sistema fue un
-   modal que renderizaba en top:-281px — presente en el DOM, correcto en el
-   HTML, e inalcanzable con el mouse.
+   Lo que busca es lo que un test de unidad NO ve: pantallas que no montan,
+   overlays que aterrizan fuera de la ventana, gráficos sin geometría, un
+   movimiento que se "guarda" y no llega al disco, glifos unicode colados. La
+   regla que lo guía: **medí dónde CAE una cosa, no solo si existe**.
 
    Corre contra un directorio de datos temporal (FINWAY_DATA): nunca toca los
    datos reales.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const { app, BrowserWindow, clipboard } = require('electron');
+const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -32,10 +31,8 @@ const ok = (n, c, x = '') => { if (c) { pass++; console.log(`  ok   ${n}`); } el
 const bail = (w, e) => { console.log(`ABORTADO ${w}`, e?.stack || e || ''); app.exit(3); };
 process.on('unhandledRejection', (e) => bail('rechazo', e));
 process.on('uncaughtException', (e) => bail('excepción', e));
-setTimeout(() => bail('timeout de 120s'), 120000);
+setTimeout(() => bail('timeout de 150s'), 150000);
 
-// Datos de prueba, en un userData aparte. Sin esto el humo escribiría en los
-// movimientos de verdad.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finway-smoke-'));
 process.env.FINWAY_DATA = tmp;   // lo lee src/store.cjs al cargarse
 app.setPath('userData', path.join(tmp, 'userData'));
@@ -43,6 +40,8 @@ app.setPath('userData', path.join(tmp, 'userData'));
 const hoy = new Date();
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const mesPasado = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 12);
+const leerDoc = (n) => { try { return JSON.parse(fs.readFileSync(path.join(tmp, `${n}.json`), 'utf8')); } catch { return null; } };
+const movs = () => leerDoc('movimientos')?.moves || [];
 
 app.whenReady().then(async () => {
   const mov = require(path.join(ROOT, 'src', 'movimientos.cjs'));
@@ -51,24 +50,13 @@ app.whenReady().then(async () => {
   await mov.add({ type: 'income', amount: 300000, date: ymd(hoy), category: 'sueldo', note: 'semilla sueldo' });
   await mov.add({ type: 'expense', amount: 5000, date: ymd(mesPasado), category: 'salidas', note: 'semilla mes pasado' });
 
-  /* El respaldo pasa por un diálogo nativo de guardar, que en un test
-     bloquearía para siempre esperando a alguien que haga click. Se le fija la
-     respuesta ANTES de registrar los handlers: así se prueba el camino
-     completo —menú → IPC → store → archivo en disco— sin el único tramo que
-     no es nuestro. */
-  const destinoBackup = path.join(tmp, 'respaldo-de-prueba.json');
+  /* Los diálogos nativos (guardar el respaldo, abrir uno para importar)
+     bloquearían el test esperando un click: se les fija la respuesta antes de
+     registrar los handlers, así se prueba todo el camino menos ese tramo. */
   const { dialog } = require('electron');
+  const destinoBackup = path.join(tmp, 'respaldo-de-prueba.json');
   const guardarFalso = async () => ({ canceled: false, filePath: destinoBackup });
-  try {
-    // Asignar a secas no alcanza si la propiedad no es escribible, y falla en
-    // silencio: el diálogo real se abre y el test se cuelga esperando un click
-    // que nadie va a hacer.
-    Object.defineProperty(dialog, 'showSaveDialog', { value: guardarFalso, writable: true, configurable: true });
-  } catch { /* se verifica abajo */ }
-  const dialogoInterceptado = dialog.showSaveDialog === guardarFalso;
-
-  /* El mismo truco para importar: se deja escrito un respaldo con formato de
-     FinWatch —el caso real de la mudanza— y el diálogo de abrir lo devuelve. */
+  try { Object.defineProperty(dialog, 'showSaveDialog', { value: guardarFalso, writable: true, configurable: true }); } catch { /* se verifica */ }
   const origenImport = path.join(tmp, 'respaldo-finwatch.json');
   fs.writeFileSync(origenImport, JSON.stringify({
     format: 'finwatch/backup', schema: 1, app: 'FinWatch 1.4.0',
@@ -79,18 +67,13 @@ app.whenReady().then(async () => {
     ],
   }), 'utf8');
   const abrirFalso = async () => ({ canceled: false, filePaths: [origenImport] });
-  try {
-    Object.defineProperty(dialog, 'showOpenDialog', { value: abrirFalso, writable: true, configurable: true });
-  } catch { /* se verifica abajo */ }
-  const abrirInterceptado = dialog.showOpenDialog === abrirFalso;
+  try { Object.defineProperty(dialog, 'showOpenDialog', { value: abrirFalso, writable: true, configurable: true }); } catch { /* se verifica */ }
 
   require(path.join(ROOT, 'src', 'ipc.cjs')).register();
 
   const win = new BrowserWindow({
-    x: -20000, y: -20000, width: W, height: H,
+    x: -20000, y: -20000, width: W, height: H, useContentSize: true,
     frame: false, show: false, paintWhenInitiallyHidden: true, backgroundColor: '#000',
-    /* Misma configuración que main.cjs, sandbox incluido: si el test corriera
-       sin sandbox probaría una app que no es la que se instala. */
     webPreferences: {
       preload: path.join(ROOT, 'preload.cjs'),
       contextIsolation: true, nodeIntegration: false, sandbox: true,
@@ -99,1155 +82,328 @@ app.whenReady().then(async () => {
   });
 
   const errores = [];
-  win.webContents.on('console-message', (e) => { if (e.level >= 2) errores.push(`${e.level}: ${e.message}`); });
+  win.webContents.on('console-message', (e) => {
+    const lvl = typeof e.level === 'number' ? e.level : { warning: 2, error: 3 }[e.level] ?? 0;
+    if (lvl >= 2) errores.push(`${e.level}: ${e.message}`);
+  });
   await win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
   win.show();
-  await sleep(2000);
+  win.focus();
+  await sleep(2200);
 
   const js = (c) => win.webContents.executeJavaScript(c);
   const click = (sel) => js(`(() => { const el = document.querySelector(${JSON.stringify(sel)});
     if (!el) return false; el.click(); return true; })()`);
-  // Un click real es pointerdown → pointerup → click, y varios overlays se
-  // cierran en pointerdown. Con `el.click()` solo, ese orden nunca se prueba.
-  const tap = (sel) => js(`(() => { const el = document.querySelector(${JSON.stringify(sel)});
-    if (!el) return false;
-    el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
-    el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, composed: true }));
-    el.click(); return true; })()`);
-  const escape = () => win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
   const rect = (sel) => js(`(() => { const el = document.querySelector(${JSON.stringify(sel)});
     if (!el) return null; const r = el.getBoundingClientRect();
     return { x: r.x, y: r.y, w: r.width, h: r.height, bottom: r.bottom, right: r.right }; })()`);
   const dentro = (r) => !!r && r.w > 0 && r.h > 0 && r.x >= 0 && r.y >= 0 && r.right <= W + 1 && r.bottom <= H + 1;
+  /* Las teclas van como teclas de verdad (sendInputEvent): así pasan por el
+     mismo camino que las del usuario, foco incluido. */
+  const tecla = async (keyCode, modifiers = []) => {
+    win.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+    if (keyCode.length === 1) win.webContents.sendInputEvent({ type: 'char', keyCode, modifiers });
+    win.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+    await sleep(60);
+  };
+  const escribir = async (sel, texto) => js(`(() => { const el = document.querySelector(${JSON.stringify(sel)});
+    if (!el) return false; el.focus(); el.value = ${JSON.stringify(texto)};
+    el.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+  const vista = () => js(`document.querySelector('.fw-fk__b.is-active')?.dataset.view`);
+  const filasLibro = () => js(`document.querySelectorAll('#mov-filas .fw-ledger__r:not([data-state="closing"])').length`);
 
   console.log('\n1. Arranque');
   ok('el splash se fue', !(await js(`!!document.getElementById('boot-splash')`)));
-  ok('el shell está montado', await js(`!!document.querySelector('.ox-titlebar') && !!document.querySelector('.ox-rail')`));
+  ok('el chasis está montado (titlebar, cinta, escenario, línea, teclas)',
+    await js(`['.ox-titlebar', '.fw-tape', '#view', '.fw-cmd', '.fw-fk'].every((s) => !!document.querySelector(s))`));
   ok('los <i data-icon> se reemplazaron por SVG', !(await js(`!!document.querySelector('i[data-icon]')`)));
-  ok('la vista inicial pintó algo', (await js(`document.getElementById('view').children.length`)) > 0);
+  ok('arranca en F1 Resumen', (await vista()) === 'resumen');
   ok('la marca está en la titlebar', dentro(await rect('#brand-mark svg')));
-  // La titlebar es la de Onyx: marca y nombre. La versión vive en Ajustes.
-  ok('la titlebar no muestra la versión', !(await js(`!!document.getElementById('brand-version')`)));
-  /* El primer llenado de los contadores no es un cambio: no destella. En
-     0.8.5 arrancaban en «0» y «—» en el HTML, el primer dato contaba como
-     cambio, y el contador y el balance quedaban teñidos de acento mientras se
-     iba el splash. tick() deja la clase puesta, así que se ve después. */
-  const destellados = await js(`['#stat-count', '#stat-balance', '[data-view="movimientos"] .ox-navitem__count']
-    .filter((s) => document.querySelector(s)?.classList.contains('ox-ticked'))`);
-  ok('al arrancar, los contadores no destellan', destellados.length === 0, destellados.join(' | '));
+  ok('la cinta tiene cifras (y dobladas para el empalme)', (await js(`document.querySelectorAll('#tape .fw-tape__item').length`)) >= 10);
+  ok('el reloj anda', /^\d\d:\d\d/.test(await js(`document.getElementById('clock').textContent`)));
+  ok('VT323 está cargada', await js(`document.fonts.check('16px VT323')`));
+  ok('el CRT arranca en suave', (await js(`document.documentElement.dataset.crt`)) === 'suave');
+  ok('la capa CRT cubre la ventana sin tapar los clics',
+    await js(`(() => { const c = document.querySelector('.fw-crt'); const s = getComputedStyle(c);
+      return s.position === 'fixed' && s.pointerEvents === 'none' && +s.opacity > 0.9; })()`));
+  const hex = await js(`(() => { const c = document.createElement('canvas').getContext('2d');
+    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ox-bg').trim(); c.fillRect(0,0,1,1);
+    const d = c.getImageData(0,0,1,1).data; return '#' + [0,1,2].map((i) => d[i].toString(16).padStart(2,'0')).join(''); })()`);
+  ok(`--ox-bg (${hex}) es el backgroundColor de la ventana (${BG_MAIN})`, hex === BG_MAIN);
 
-  console.log('\n2. El color que la app le manda a su propia ventana');
-  const hex = await js(`(async () => (await import('./js/ui.js')).colorToken('--ox-bg'))()`);
-  ok(`colorToken('--ox-bg') devuelve un hex (${hex})`, /^#[0-9a-f]{6}$/i.test(hex || ''), String(hex));
-  ok(`coincide con el BG de main.cjs (${BG_MAIN})`, (hex || '').toLowerCase() === BG_MAIN, `${hex} vs ${BG_MAIN}`);
+  console.log('\n2. Las teclas de función');
+  const pantallas = ['resumen', 'movimientos', 'presupuestos', 'metas', 'calculadora', 'ajustes'];
+  for (let i = 0; i < pantallas.length; i++) {
+    await tecla(`F${i + 1}`);
+    await sleep(650);
+    ok(`F${i + 1} → ${pantallas[i]}`, (await vista()) === pantallas[i]
+      && (await js(`document.getElementById('crumb-view').textContent.trim()`)) === pantallas[i].toUpperCase());
+  }
+  ok('en Ajustes las migas no muestran mes', await js(`document.getElementById('crumb').classList.contains('is-sin-mes')`));
+  await click('.fw-fk__b[data-view="resumen"]');
+  await sleep(650);
+  ok('un clic en la tecla también navega', (await vista()) === 'resumen');
+  ok('en Resumen las migas muestran el mes', !(await js(`document.getElementById('crumb').classList.contains('is-sin-mes')`)));
 
-  console.log('\n3. Resumen: los números y los tres gráficos');
-  ok('hay cuatro KPIs', (await js(`document.querySelectorAll('.fw-kpi').length`)) === 4);
-  const balance = await js(`document.querySelector('.fw-kpi--bal .ox-stat__value').textContent.trim()`);
-  ok('el balance dice plata', /\$/.test(balance), balance);
-  const segs = await js(`document.querySelectorAll('.fw-donut__seg').length`);
-  ok('el donut tiene un segmento por categoría con gasto', segs === 2, String(segs));
-  /* Un <path> puede existir con d="" y no dibujar nada: hay que medir el largo
-     del trazo, no la presencia del nodo. */
-  const largo = await js(`(() => { const p = document.querySelector('.fw-line__cur'); return p ? p.getTotalLength() : 0; })()`);
-  ok('la línea del mes tiene trazo real', largo > 10, String(largo));
-  /* El ingreso acumulado es el mismo gráfico con otra tinta: tiene que ser un
-     SVG aparte (ids propios, sin pisarle nada al drenaje) y teñirse de verde. */
-  const lineIn = await js(`(() => { const p = document.querySelector('#line-in-svg .fw-line__cur');
-    return { largo: p ? p.getTotalLength() : 0, stroke: p ? getComputedStyle(p).stroke : '',
-      verde: getComputedStyle(document.documentElement).getPropertyValue('--fw-in').trim(),
-      drenaje: !!document.querySelector('#line-svg .fw-line__cur') }; })()`);
-  ok('el ingreso acumulado tiene su propia línea con trazo', lineIn.largo > 10 && lineIn.drenaje, JSON.stringify(lineIn));
-  const pintaDe = async (sel, prop) => js(`(() => { const cv = document.createElement('canvas'); cv.width = cv.height = 1;
-    const cx = cv.getContext('2d'); cx.fillStyle = getComputedStyle(document.querySelector(${JSON.stringify(sel)}))[${JSON.stringify(prop)}];
-    cx.fillRect(0, 0, 1, 1); return [...cx.getImageData(0, 0, 1, 1).data].slice(0, 3).join(','); })()`);
-  ok('y va en verde, no en el rojo del drenaje',
-    (await pintaDe('#line-in-svg .fw-line__cur', 'stroke')) === (await pintaDe('.fw-bar--in', 'fill'))
-    && (await pintaDe('#line-in-svg .fw-line__cur', 'stroke')) !== (await pintaDe('#line-svg .fw-line__cur', 'stroke')));
-  const barras = await js(`[...document.querySelectorAll('.fw-bar')].filter(b => Number(b.getAttribute('height')) > 0).length`);
-  ok('las barras tienen altura', barras >= 2, String(barras));
-  ok('el eje de las barras muestra 6 meses', (await js(`document.querySelectorAll('#bars-svg .fw-bar-month').length`)) === 6);
-
-  /* Cada categoría tiene SU color (21 sep 2026). No alcanza con que los
-     strings sean distintos: once strings distintos pueden ser once colores
-     casi iguales, que es lo que ya falló con la rampa monocroma. Se mide la
-     distancia perceptual real en Oklab de lo que se pinta. */
-  const labDe = async (sel, prop) => js(`(() => {
-    const cv = document.createElement('canvas'); cv.width = cv.height = 1;
-    const cx = cv.getContext('2d', { willReadFrequently: true });
-    return [...document.querySelectorAll(${JSON.stringify(sel)})].map((el) => {
-      cx.clearRect(0, 0, 1, 1); cx.fillStyle = getComputedStyle(el)[${JSON.stringify(prop)}]; cx.fillRect(0, 0, 1, 1);
-      const d = cx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; });
-  })()`);
-  const aLab = ([r, g, b]) => {
-    const f = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-    const [R, G, B] = [f(r), f(g), f(b)];
-    const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
-    const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
-    const q = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
-    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * q,
-      1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * q,
-      0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * q];
-  };
-  const croma = ([, a, b]) => Math.hypot(a, b);
-  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-  const gajos = (await labDe('.fw-donut__seg', 'stroke')).map(aLab);
-  ok('los gajos del donut tienen color', gajos.length > 0 && gajos.some((g) => croma(g) > 0.05),
-    gajos.map((g) => croma(g).toFixed(3)).join(' '));
-  const leyenda = (await labDe('.fw-legend__item .fw-dot', 'backgroundColor')).map(aLab);
-  ok('la leyenda repite el color de su gajo, en el mismo orden',
-    leyenda.length === gajos.length && leyenda.every((c, i) => dist(c, gajos[i]) < 0.01));
-
-  console.log('\n3b. Tendencia por categoría');
-  const tr = await js(`(() => {
-    const series = [...document.querySelectorAll('.fw-trend__serie')];
-    return {
-      chips: document.querySelectorAll('.fw-tcat').length,
-      series: series.length,
-      on: series.filter((g) => !g.classList.contains('is-off')).length,
-      meses: document.querySelectorAll('#trend-svg .fw-bar-month').length,
-    }; })()`);
-  ok('un chip y una línea por categoría con gasto', tr.chips === 3 && tr.series === 3, JSON.stringify(tr));
-  ok('arranca con todas prendidas', tr.on === 3, JSON.stringify(tr));
-  ok('y muestra 6 meses', tr.meses === 6, JSON.stringify(tr));
-  const alturaDe = (cat) => js(`parseFloat(getComputedStyle(document.querySelector('.fw-trend__serie[data-cat="${cat}"] .fw-trend__pt:last-of-type')).cy)`);
-  const piso = await js(`Number(document.querySelector('#trend-svg .fw-axis').getAttribute('y1'))`);
-  // Doble click deja SOLO esa: las demás bajan al piso y se apagan, y la
-  // escala se rehace sobre ella — su punto del mes queda arriba de todo.
-  await js(`document.querySelector('.fw-tcat[data-cat="transporte"]').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
-  await sleep(800);
-  const solo = await js(`[...document.querySelectorAll('.fw-trend__serie')].filter((g) => !g.classList.contains('is-off')).map((g) => g.dataset.cat)`);
-  ok('doble click en un chip deja solo esa categoría', solo.length === 1 && solo[0] === 'transporte', JSON.stringify(solo));
-  ok('la escala se rehace sobre ella (llega al techo)', (await alturaDe('transporte')) < 30, String(await alturaDe('transporte')));
-  ok('las apagadas bajan al piso', Math.abs((await alturaDe('comida')) - piso) < 1, `${await alturaDe('comida')} vs ${piso}`);
-  await click('.fw-tcat[data-cat="comida"]');
+  console.log('\n3. F1 Resumen');
+  await sleep(900);
+  const bal = await js(`document.getElementById('bal-big').textContent`);
+  ok('el balance rodó hasta su valor (300.000 − 20.900)', bal === '279.100', bal);
+  ok('una fila por categoría con gasto', (await js(`document.querySelectorAll('#res-cat-zone tbody tr').length`)) === 2);
+  ok('los últimos movimientos del mes', (await js(`document.querySelectorAll('#res-feed li').length`)) === 3);
+  ok('seis meses en el panel 05, con el actual elegido', await js(`document.querySelectorAll('.fw-mcol').length === 6 && !!document.querySelector('.fw-mcol.is-sel')`));
+  const largo = await js(`document.querySelector('#dren-svg .fw-s--out')?.getTotalLength() || 0`);
+  ok('la línea de gasto tiene trazo', largo > 5, String(largo));
+  await js(`(() => { const h = document.getElementById('dren-hit'); const r = h.getBoundingClientRect();
+    h.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r.x + r.width * .4, clientY: r.y + r.height / 2 })); })()`);
+  await sleep(300);
+  ok('al pasar el mouse aparece la lectura del día', await js(`document.getElementById('dren-ro').classList.contains('is-on')`));
+  ok('y cae adentro del panel', await js(`(() => { const a = document.getElementById('dren-ro').getBoundingClientRect(); const b = document.querySelector('.fw-res__dren').getBoundingClientRect();
+    return a.x >= b.x - 1 && a.right <= b.right + 1 && a.y >= b.y; })()`));
+  await click('.fw-dren__legend [data-s="in"]');
+  await sleep(400);
+  ok('apagar INGRESO esconde su línea', await js(`document.querySelector('#dren-svg .fw-s--in').classList.contains('is-off')`));
+  await click('.fw-dren__legend [data-s="in"]');
+  await click('#res-modo [data-modo="tendencia"]');
   await sleep(700);
-  ok('un click prende otra más', (await js(`document.querySelectorAll('.fw-tcat.is-on').length`)) === 2);
-  await click('#trend-all');   // con dos de tres, «Todas»
+  ok('el panel 03 pasa a TENDENCIA, con un chip por categoría', (await js(`document.querySelectorAll('.fw-tcat').length`)) >= 2);
+  await click('#res-modo [data-modo="acumulado"]');
+  await sleep(700);
+  ok('y vuelve a ACUMULADO', await js(`!!document.getElementById('dren-svg')`));
+
+  console.log('\n4. El mes');
+  await tecla('Left');
+  await sleep(1000);
+  ok('← va al mes anterior', (await js(`document.querySelector('.fw-mcol.is-sel')?.dataset.ym`)) === ymd(mesPasado).slice(0, 7));
+  ok('y el balance es el de ese mes', (await js(`document.getElementById('bal-big').textContent`)) === '−5.000',
+    await js(`document.getElementById('bal-big').textContent`));
+  await tecla('Home');
+  await sleep(1000);
+  ok('Inicio vuelve al mes de hoy', (await js(`document.querySelector('.fw-mcol.is-sel')?.dataset.ym`)) === ymd(hoy).slice(0, 7));
+
+  console.log('\n5. La línea de carga');
+  await tecla('/');
+  await sleep(150);
+  ok('/ la enfoca', (await js(`document.activeElement?.id`)) === 'cmd');
+  await escribir('#cmd', 'gasto 4500 transp prueba humo');
   await sleep(200);
-  ok('«Todas» prende todas', (await js(`document.querySelectorAll('.fw-tcat.is-on').length`)) === 3);
-  await click('#trend-all');   // y ahora dice «Ninguna»
+  const toks = await js(`[...document.querySelectorAll('#parse .fw-tok')].map((t) => t.classList.contains('is-ok') ? 1 : 0).join('')`);
+  ok('se entiende mientras se escribe (tipo, monto, cat, nota, fecha)', toks === '11111', toks);
+  const antes = movs().length;
+  await tecla('Return');
+  await sleep(900);
+  ok('Enter lo guarda EN EL DISCO', movs().length === antes + 1
+    && movs().some((m) => m.note === 'prueba humo' && m.amount === 4500 && m.category === 'transporte'), `${antes} → ${movs().length}`);
+  ok('la línea queda vacía para el siguiente', (await js(`document.getElementById('cmd').value`)) === '');
+  ok('el toast aparece adentro de la ventana', dentro(await rect('.ox-toast')));
+  await escribir('#cmd', 'gasto uber');
+  await tecla('Return');
+  await sleep(250);
+  ok('sin monto no guarda y la línea se sacude', movs().length === antes + 1
+    && await js(`document.getElementById('cmd').classList.contains('is-shaking')`));
+  await escribir('#cmd', '');
+  await tecla('Up');
+  await sleep(150);
+  ok('↑ con la línea vacía trae la última que se guardó', (await js(`document.getElementById('cmd').value`)) === 'gasto 4500 transp prueba humo');
+  await escribir('#cmd', '');
+  await tecla('Escape');
+  await sleep(200);
+
+  console.log('\n6. F2 Movimientos');
+  await tecla('F2');
+  await sleep(900);
+  ok('el libro tiene los movimientos del mes', (await filasLibro()) === 4, String(await filasLibro()));
+  ok('con su saldo corrido', await js(`[...document.querySelectorAll('.fw-ledger__saldo')].every((td) => td.textContent.trim().length > 0)`));
+  const sel0 = await js(`document.querySelector('.fw-ledger__r.is-sel')?.dataset.id`);
+  await tecla('Down');
+  await sleep(400);
+  const sel1 = await js(`document.querySelector('.fw-ledger__r.is-sel')?.dataset.id`);
+  ok('↓ elige el de abajo', !!sel0 && !!sel1 && sel0 !== sel1);
+  ok('y el detalle habla de él', (await js(`document.querySelector('#mov-det-p .fw-p__m').textContent`)) === '2 DE 4');
+  await tecla('g');
+  await sleep(700);
+  ok('G deja solo los gastos', (await filasLibro()) === 3, String(await filasLibro()));
+  await tecla('t');
+  await sleep(700);
+  await click('#mov-cat');
   await sleep(500);
-  ok('«Ninguna» las apaga y avisa', (await js(`document.querySelectorAll('.fw-tcat.is-on').length`)) === 0
-    && (await js(`document.querySelector('#trend-none').classList.contains('is-open')`)));
-  await click('#trend-all');
-  await click('#trend-range [data-value="12"]');
+  ok('el menú de categorías cae adentro de la ventana', dentro(await rect('.ox-menu')));
+  await js(`[...document.querySelectorAll('.ox-menuitem')].find((b) => /Comida/.test(b.textContent))?.click()`);
+  await sleep(700);
+  ok('elegir Comida filtra el libro', (await filasLibro()) === 1, String(await filasLibro()));
+  ok('y el botón dice la categoría', /COMIDA/.test(await js(`document.getElementById('mov-cat').textContent`)));
+  await click('#mov-cat');
+  await sleep(450);
+  await js(`[...document.querySelectorAll('.ox-menuitem')].find((b) => /Todas/.test(b.textContent))?.click()`);
   await sleep(600);
-  ok('el rango de 12 meses repinta solo la tendencia',
-    (await js(`document.querySelectorAll('#trend-svg .fw-bar-month').length`)) === 12
-    && (await js(`document.querySelectorAll('.fw-donut__seg').length`)) === 2);
-  // El tooltip: pasar el mouse por el último mes lo abre DENTRO de la card.
-  await js(`document.querySelector('#trend-card').scrollIntoView({ block: 'end' })`);
+  await escribir('#mov-q', 'nafta');
+  await sleep(700);
+  ok('el filtro de texto busca en la nota', (await filasLibro()) === 1, String(await filasLibro()));
+  await escribir('#mov-q', '');
+  await sleep(700);
+  await js(`document.activeElement.blur()`);
+
+  // Editar: E abre el formulario con el movimiento cargado.
+  await js(`[...document.querySelectorAll('.fw-ledger__r')].find((r) => /semilla nafta/.test(r.textContent))?.click()`);
   await sleep(300);
-  const svgR = await rect('#trend-svg');
-  win.webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(svgR.right - 30), y: Math.round(svgR.y + svgR.h / 2) });
-  await sleep(500);
-  const tipR = await rect('#trend-tip');
-  const cardR = await rect('#trend-card');
-  ok('el tooltip del mes se abre y cae dentro de la card',
-    (await js(`document.querySelector('#trend-tip').classList.contains('is-open')`)) && tipR.x >= cardR.x && tipR.right <= cardR.right + 1,
-    JSON.stringify({ tipR, cardR }));
-  win.webContents.sendInputEvent({ type: 'mouseMove', x: 5, y: 5 });
-  await click('#trend-range [data-value="6"]');
-
-  await click('[data-view="movimientos"]');
+  await tecla('e');
   await sleep(700);
-  ok('están los once chips de categoría', (await js(`document.querySelectorAll('#qa-cats .fw-cat-btn').length`)) === 11);
-  const puntos = (await labDe('#qa-cats .fw-cat-btn .fw-dot', 'backgroundColor')).map(aLab);
-  let minima = Infinity;
-  puntos.forEach((a, i) => puntos.forEach((b, j) => { if (j > i) minima = Math.min(minima, dist(a, b)); }));
-  ok(`el abanico separa a todas las categorías (mínima ${minima.toFixed(3)} ≥ 0.09)`, puntos.length === 11 && minima >= 0.09);
-  const sem = (await js(`(() => { const cs = getComputedStyle(document.documentElement);
-    const cv = document.createElement('canvas'); cv.width = cv.height = 1; const cx = cv.getContext('2d');
-    return ['--fw-in', '--fw-out'].map((v) => { cx.fillStyle = cs.getPropertyValue(v); cx.fillRect(0, 0, 1, 1);
-      const d = cx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; }); })()`)).map(aLab);
-  const contraPar = Math.min(...puntos.flatMap((p) => sem.map((q) => dist(p, q))));
-  ok(`y ninguna se confunde con el verde o el rojo (mínima ${contraPar.toFixed(3)} ≥ 0.08)`, contraPar >= 0.08);
-  ok('la tabla pinta el puntito de su categoría', await js(`!!document.querySelector('#mv-rows .fw-cat .fw-dot')`));
-
-  /* Las cifras NO cambian de color con el signo (17 sep 2026): el balance da
-     positivo este mes y negativo el anterior —el anterior tiene un gasto y
-     ningún ingreso— y tiene que verse con la misma tinta en los dos. */
-  await click('[data-view="resumen"]');
-  await sleep(800);
-  ok('los KPIs son cifras sueltas de Onyx, sin tarjeta',
-    await js(`[...document.querySelectorAll('.fw-kpi')].every((k) => getComputedStyle(k).backgroundColor === 'rgba(0, 0, 0, 0)' && getComputedStyle(k).boxShadow === 'none')`));
-  const valorBal = () => js(`getComputedStyle(document.querySelector('.fw-kpi--bal .ox-stat__value')).color`);
-  const balPos = await valorBal();
-  await click('[data-month="-1"]');
-  await sleep(800);
-  const balNeg = await valorBal();
-  ok('con balance negativo la cifra NO cambia de color', balNeg === balPos, `${balPos} -> ${balNeg}`);
-  const textoPrim = await js(`(() => { const p = document.createElement('span'); p.style.color = 'var(--ox-text)';
-    document.body.appendChild(p); const c = getComputedStyle(p).color; p.remove(); return c; })()`);
-  ok('y es el texto primario de Onyx, no el par verde/rojo', balNeg === textoPrim, `${balNeg} vs ${textoPrim}`);
-  /* Ninguna cifra de la app se tiñe: ni los otros KPIs, ni los montos de la
-     lista, ni el campo de carga. El croma lo mide el mismo lector de siempre. */
-  const cifras = await js(`(() => {
-    const cv = document.createElement('canvas'); cv.width = cv.height = 1;
-    const cx = cv.getContext('2d', { willReadFrequently: true });
-    const leer = (c) => { cx.clearRect(0,0,1,1); cx.fillStyle = c; cx.fillRect(0,0,1,1);
-      const d = cx.getImageData(0,0,1,1).data; return [d[0], d[1], d[2]]; };
-    return [...document.querySelectorAll('.fw-kpi .ox-stat__value, .fw-amount, .fw-readout__in, .fw-readout__out, .fw-readout__net, .fw-amountfield__input')]
-      .map((e) => leer(getComputedStyle(e).color));
-  })()`);
-  const gris = ([r, g, b]) => Math.max(r, g, b) - Math.min(r, g, b) < 12;
-  ok(`las ${cifras.length} cifras a la vista son neutras`, cifras.length > 0 && cifras.every(gris),
-    JSON.stringify(cifras.filter((c) => !gris(c))));
-  await click('[data-month="hoy"]');
-  await sleep(800);
-
-  console.log('\n3-bis. El par verde/rojo: parejo entre sí y legible');
-  /* El par es el protagonista de la app, así que tiene dos obligaciones que un
-     color decorativo no tiene: pesar IGUAL entre sí —si no, la pantalla se
-     inclina para un lado— y leerse al tamaño en que se lo usa. */
-  const par = await js(`(() => {
-    const cv = document.createElement('canvas'); cv.width = cv.height = 1;
-    const cx = cv.getContext('2d', { willReadFrequently: true });
-    const leer = (c) => { cx.clearRect(0,0,1,1); cx.fillStyle = c; cx.fillRect(0,0,1,1);
-      const d = cx.getImageData(0,0,1,1).data; return [d[0], d[1], d[2]]; };
-    const cs = getComputedStyle(document.documentElement);
-    const t = (n) => leer(cs.getPropertyValue(n));
-    return { in: t('--fw-in'), out: t('--fw-out'), bg: t('--ox-bg'), s2: t('--ox-s2') };
-  })()`);
-
-  const relL = ([r, g, b]) => {
-    const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  };
-  const contraste = (a, b) => {
-    const [x, y] = [relL(a), relL(b)].sort((p, q) => q - p);
-    return (x + 0.05) / (y + 0.05);
-  };
-
-  /* Pesar igual = misma luminancia. No se comparan las cromas: en sRGB el verde
-     no llega tan lejos como el rojo, y exigir el mismo número dejaría el verde
-     apagado — el emparejado es por porcentaje del techo de cada matiz. */
-  const dif = Math.abs(relL(par.in) - relL(par.out));
-  ok(`el verde y el rojo pesan lo mismo (luminancias a ${dif.toFixed(3)})`, dif < 0.06,
-    `verde ${relL(par.in).toFixed(3)} · rojo ${relL(par.out).toFixed(3)}`);
-
-  /* El par vive solo en masas y trazos del gráfico —barras, línea, leyendas—,
-     nunca en texto chico: le alcanza con 3:1 contra la card. */
-  for (const [nombre, color] of [['rojo', par.out], ['verde', par.in]]) {
-    const c = contraste(color, par.s2);
-    ok(`el ${nombre} se lee sobre la card (${c.toFixed(2)}:1)`, c >= 3);
-  }
-
-  console.log('\n4. Las dos vistas montan y quedan activas en el rail');
-  for (const v of ['movimientos', 'resumen', 'movimientos']) {
-    await click(`[data-view="${v}"]`);
-    await sleep(600);
-    const hijos = await js(`document.getElementById('view').children.length`);
-    const activo = await js(`!!document.querySelector('[data-view="${v}"].is-active')`);
-    ok(`${v}: pinta y se ilumina`, hijos > 0 && activo, `hijos=${hijos} activo=${activo}`);
-  }
-
-  console.log('\n5. Cargar un movimiento por la UI real: teclado → disco');
-  ok('el inspector de carga está montado', dentro(await rect('#qa')));
-  await js(`(() => { const i = document.getElementById('qa-amount');
-    i.value = '4321,50'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-  await click('[data-cat="devoluciones"]');
-  await js(`(() => { const n = document.getElementById('qa-note');
-    n.value = 'cargado por el humo'; n.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-  await click('#qa-submit');
-  await sleep(900);
-
-  const guardado = await js(`window.fw.load().then(l => l.find(m => m.note === 'cargado por el humo') || null)`);
-  ok('quedó en disco', !!guardado, JSON.stringify(guardado));
-  ok('la coma decimal se guardó como 4321.5', guardado?.amount === 4321.5, String(guardado?.amount));
-  ok('con la categoría elegida', guardado?.category === 'devoluciones', String(guardado?.category));
-  ok('el toast avisa', dentro(await rect('.ox-toast')));
-  ok('el campo de monto se vació para el siguiente', (await js(`document.getElementById('qa-amount').value`)) === '');
-  ok('y se quedó con el foco', await js(`document.activeElement?.id === 'qa-amount'`),
-    await js(`document.activeElement?.id || '(nada)'`));
-
-  console.log('\n5-bis. El campo de monto: un solo anillo y un cursor blanco');
-  /* El focus ring de base.css se dibuja alrededor del elemento enfocado, que
-     acá es el <input> de adentro: quedaba el anillo blanco del sistema
-     encerrado dentro del anillo magenta de la caja. Dos anillos concéntricos.
-
-     Para verlo hay que llegar con el TECLADO y con un Tab de verdad: la
-     heurística de :focus-visible solo mira eventos confiables, así que con un
-     dispatchEvent o un .focus() programático el anillo nunca aparece y el
-     arreglo parece bueno sin haberse probado. */
-  await js(`document.querySelector('#qa-type [data-value="income"]').focus()`);
-  win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
-  win.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
-  // El box-shadow tiene transición: medir de inmediato devuelve el valor viejo.
-  await sleep(500);
-  const foco = await js(`(() => { const i = document.getElementById('qa-amount');
-    if (document.activeElement !== i) return { llego: false };
-    const s = getComputedStyle(i);
-    const p = document.createElement('span'); p.style.color = 'var(--ox-text)';
-    document.body.appendChild(p); const primario = getComputedStyle(p).color; p.remove();
-    return { llego: true, focusVisible: i.matches(':focus-visible'),
-             sombra: s.boxShadow, caret: s.caretColor, texto: s.color, primario }; })()`);
-  ok('el Tab llega al campo de monto', foco.llego, JSON.stringify(foco));
-  ok('el input NO dibuja su propio anillo adentro de la caja',
-    foco.sombra === 'none', String(foco.sombra));
-
-  /* Lo de arriba mide el estado en el que quedó el campo, y si Chromium no
-     marcó este foco como "de teclado" (`focusVisible` abajo), entonces NO
-     probó el caso que importa: el anillo de base.css se dibuja bajo
-     :focus-visible. La modalidad depende de con qué se tocó la app por última
-     vez y el test hace clicks antes de llegar acá, así que en vez de pelearle
-     a la heurística se verifica la REGLA, que es determinista. */
-  const reglaFoco = await js(`(() => {
-    for (const hoja of document.styleSheets) {
-      let reglas; try { reglas = hoja.cssRules; } catch { continue; }
-      for (const r of reglas) {
-        if (r.selectorText === '.fw-amountfield__input:focus-visible') return r.style.boxShadow;
-      }
-    }
-    return null;
-  })()`);
-  ok('y hay una regla que se lo apaga cuando el foco viene del teclado',
-    reglaFoco === 'none', `modalidad de este foco: ${foco.focusVisible ? 'teclado' : 'puntero'} · regla: ${reglaFoco}`);
-  /* La caja es un .ox-input agrandado: hairline en reposo y, con el foco, el
-     mismo anillo que cualquier campo de Onyx. */
-  const caja = await js(`(() => { const s = getComputedStyle(document.getElementById('qa-amountfield'));
-    return { sombra: s.boxShadow, fondo: s.backgroundColor }; })()`);
-  ok('con el foco, la caja lleva el anillo de Onyx', /0px 0px 0px 3px/.test(caja.sombra), String(caja.sombra));
-  /* Antes esto medía caret ≠ texto, porque la cifra se teñía según el tipo.
-     Desde que las cifras son neutras los dos son el texto primario de Onyx, y
-     lo que hay que custodiar es justamente eso: que ninguno de los dos vuelva
-     a tomar el verde o el rojo. */
-  ok('el cursor y la cifra son el texto primario, sin tinte del tipo',
-    foco.caret === foco.primario && foco.texto === foco.primario,
-    `caret=${foco.caret} texto=${foco.texto} primario=${foco.primario}`);
-  await js(`document.getElementById('qa-amount').blur()`);
-  await sleep(400);
-  const sinFoco = await js(`getComputedStyle(document.getElementById('qa-amountfield')).boxShadow`);
-  ok('y sin foco vuelve a su hairline, sin el anillo',
-    sinFoco !== 'none' && !/0px 0px 0px 3px/.test(sinFoco), String(sinFoco));
-
-  /* El botón de registrar es un botón común de Onyx: sin teclas adentro. La
-     que estaba se leía como un segundo botón metido en el primero. */
-  ok('el botón de registrar no lleva una tecla adentro',
-    !(await js(`!!document.querySelector('#qa-submit .ox-kbd')`)));
-  ok('pero el atajo sigue anunciado en su tooltip',
-    (await js(`document.getElementById('qa-submit').dataset.tipKey`)) === 'Enter');
-
-  console.log('\n6. El calendario aterriza DONDE se lo puede usar');
+  ok('E abre el formulario del movimiento', await js(`!!document.querySelector('.ox-modal .fw-qa')`));
+  ok('con su monto cargado', (await js(`document.getElementById('qa-amount')?.value`)) === '8400');
+  ok('y el modal cae adentro de la ventana', dentro(await rect('.ox-modal')));
   await click('#qa-dp-field');
+  await sleep(500);
+  ok('el calendario abre adentro de la ventana', dentro(await rect('.fw-dp__pop')));
+  ok('con su grilla fija de 42 días', (await js(`document.querySelectorAll('.fw-dp__day').length`)) === 42);
+  const fondosUA = await js(`(() => [...document.querySelectorAll('button')]
+    .map((b) => ({ id: b.className || b.id, bg: getComputedStyle(b).backgroundColor, border: getComputedStyle(b).borderStyle }))
+    .filter((x) => x.bg === 'rgb(240, 240, 240)' || x.border === 'outset').map((x) => x.id))()`);
+  ok('ningún botón heredó el fondo o el borde de fábrica de Chromium', fondosUA.length === 0, [...new Set(fondosUA)].join(' | '));
+  await tecla('Escape');
   await sleep(400);
-  const pop = await rect('.fw-dp__pop');
-  ok('el calendario abre', !!pop);
-  ok('y cae entero dentro de la ventana', dentro(pop), JSON.stringify(pop));
-  ok('se portalea al layer, fuera del scroll que lo recortaba',
-    await js(`!!document.querySelector('#ox-layer .fw-dp__portal')`));
-  /* El bug que motivó el portal: abriéndose hacia arriba tapaba el monto, las
-     categorías y el banner — el formulario entero quedaba atrás. */
-  const monto = await rect('#qa-amountfield');
-  const tapa = !!pop && !!monto && pop.y < monto.bottom && pop.bottom > monto.y
-            && pop.x < monto.right && pop.right > monto.x;
-  ok('NO tapa el campo de monto', !tapa, `cal=${JSON.stringify(pop)} monto=${JSON.stringify(monto)}`);
-  ok('tiene la grilla fija de 42 días', (await js(`document.querySelectorAll('.fw-dp__day').length`)) === 42);
-  const hoyMarcado = await js(`document.querySelectorAll('.fw-dp__day.is-today').length`);
-  ok('hoy está marcado una sola vez', hoyMarcado === 1, String(hoyMarcado));
-  /* Hoy y el día elegido son el mismo al arrancar: si los dos estilos se
-     pisaran, el contorno de hoy quedaría encimado al canto del elegido. Gana
-     la selección: la sombra es la del elegido solo (con la piel de Opal, el
-     canto tallado; antes era 'none'), medida sobre una sonda con la misma
-     declaración para no repetir acá el color del token. */
-  const hoySel = await js(`(() => { const d = document.querySelector('.fw-dp__day.is-today.is-selected');
-    if (!d) return null;
-    const sonda = document.createElement('div');
-    sonda.style.boxShadow = 'inset 0 0 0 1px var(--ox-rim-2)';
-    document.body.append(sonda);
-    const esperada = getComputedStyle(sonda).boxShadow;
-    sonda.remove();
-    return { sombra: getComputedStyle(d).boxShadow, esperada }; })()`);
-  ok('el día que es hoy Y está elegido no lleva los dos estilos encimados',
-    !hoySel || hoySel.sombra === hoySel.esperada, JSON.stringify(hoySel));
-  await tap('#qa-dp-field');
-  await sleep(500);
-  ok('y cierra', !(await js(`!!document.querySelector('.fw-dp__pop')`)));
+  ok('Esc cierra el calendario y el formulario sigue', !(await js(`!!document.querySelector('.fw-dp__pop')`)) && await js(`!!document.querySelector('.ox-modal')`));
+  await escribir('#qa-amount', '9100');
+  await tecla('Return');
+  await sleep(1000);
+  ok('Enter guarda la edición en el disco', movs().some((m) => m.note === 'semilla nafta' && m.amount === 9100));
+  ok('y el modal se cerró', !(await js(`!!document.querySelector('.ox-modal')`)));
 
-  /* El portal vive afuera de la vista: si el inspector se repinta con el
-     calendario abierto, tiene que irse con él y no quedar flotando. */
-  await click('#qa-dp-field');
-  await sleep(350);
-  await click('#qa-type [data-value="income"]');
-  await sleep(500);
-  ok('repintar el inspector se lleva el calendario abierto',
-    !(await js(`!!document.querySelector('#ox-layer .fw-dp__portal')`)));
-  await click('#qa-type [data-value="expense"]');
-  await sleep(400);
-
-  console.log('\n7. Borrar pide confirmación propia, no un confirm() del sistema');
-  await click('[data-del]');
-  await sleep(600);
-  const modal = await rect('.ox-modal');
-  ok('el modal de confirmación abre', !!modal);
-  ok('y cae entero dentro de la ventana', dentro(modal), JSON.stringify(modal));
-  ok('el botón de borrar es el rojo macizo', await js(`!!document.querySelector('.ox-modal .ox-btn--danger-solid')`));
-  const antes = await js(`window.fw.load().then(l => l.length)`);
-  await click('.ox-modal .ox-btn--danger-solid');
-  await sleep(900);
-  const despues = await js(`window.fw.load().then(l => l.length)`);
-  ok('confirmar borra exactamente uno', despues === antes - 1, `${antes} → ${despues}`);
-  ok('el modal se fue', !(await js(`!!document.querySelector('.ox-modal')`)));
-
-  console.log('\n7-bis. El menú contextual de la fila');
-  /* Menu.show() le da al menú como mínimo el ancho de su ancla. Anclado al
-     <tr> —que ocupa toda la tabla— salía de 688px y se iba de la ventana; por
-     eso el contextual se ancla a un punto de 0×0 donde está el mouse. */
-  await js(`(() => { const tr = document.querySelector('.ox-tr');
-    tr.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 400, clientY: 300 })); })()`);
-  await sleep(600);
-  const menu = await rect('.ox-menu');
-  ok('el menú abre', !!menu);
-  ok('y cae entero dentro de la ventana', dentro(menu), JSON.stringify(menu));
-  ok('no se estira al ancho de la fila', !!menu && menu.w < 300, `ancho=${menu?.w}`);
-  await escape();
-  await sleep(400);
-  ok('Escape lo cierra', !(await js(`!!document.querySelector('.ox-menu:not([data-state="closing"])')`)));
-
-  /* Y navegar también. Con el mouse el menú se cierra solo —el pointerdown cae
-     afuera— pero por teclado o por un atajo quedaba flotando sobre una vista
-     que ya no es la suya. */
-  await js(`(() => { const tr = document.querySelector('.ox-tr');
-    tr.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 400, clientY: 300 })); })()`);
-  await sleep(500);
-  await click('[data-view="resumen"]');
-  await sleep(700);
-  ok('cambiar de vista también lo cierra',
-    !(await js(`!!document.querySelector('.ox-menu:not([data-state="closing"])')`)));
-  await click('[data-view="movimientos"]');
-  await sleep(700);
-
-  console.log('\n7-ter. El respaldo se lleva TODO, no el mes en pantalla');
-  /* El mes actual tiene 3 movimientos sembrados (uno se cargó y otro se borró
-     más arriba) y el anterior tiene 1. El respaldo tiene que traer los dos
-     meses: si alguien lo hiciera sobre la lista filtrada que se está viendo,
-     este número sería menor y el archivo mentiría. */
-  ok('se pudo interceptar el diálogo de guardar', dialogoInterceptado,
-    'sin esto el test abriría el diálogo real y se colgaría');
-  const enDisco = await js(`window.fw.load().then((l) => l.length)`);
-  if (!dialogoInterceptado) { fail++; console.log('  FALLA se saltea el resto del respaldo'); }
-  else {
-  await click('#mv-export');
-  await sleep(600);
-  const items = await js(`[...document.querySelectorAll('.ox-menuitem')].map((b) => b.textContent.trim())`);
-  ok('el botón de exportar ofrece las dos salidas', items.length === 2, items.join(' | '));
-  ok('y dice cuántos se lleva cada una', items.some((t) => t.includes(String(enDisco))), items.join(' | '));
-  await js(`[...document.querySelectorAll('.ox-menuitem')].find((b) => /respaldo/i.test(b.textContent)).click()`);
-  await sleep(900);
-
-  ok('el archivo quedó escrito', fs.existsSync(destinoBackup));
-  const guardado = JSON.parse(fs.readFileSync(destinoBackup, 'utf8'));
-  ok('se declara como respaldo de Finway', guardado.format === 'finway/backup', String(guardado.format));
-  ok('trae TODOS los movimientos del disco', guardado.moves.length === enDisco,
-    `${guardado.moves.length} en el archivo · ${enDisco} en disco`);
-  ok('y más de un mes', new Set(guardado.moves.map((m) => m.date.slice(0, 7))).size > 1,
-    [...new Set(guardado.moves.map((m) => m.date.slice(0, 7)))].join(', '));
-  ok('el toast lo confirma', dentro(await rect('.ox-toast')));
-  }
-
-  console.log('\n8. Filtro y navegación de mes');
-  await click('#mv-filter [data-value="income"]');
-  await sleep(500);
-  const filas = await js(`document.querySelectorAll('#mv-rows .ox-tr').length`);
-  ok('el filtro de ingresos deja solo ingresos', filas === 1, String(filas));
-  await click('#mv-filter [data-value="all"]');
-  await sleep(400);
-
-  // Filtro de categoría: el select abre un menú con las dos listas, cada
-  // categoría con su puntito y su cuenta del mes; las vacías, apagadas.
-  await click('#mv-cat');
-  await sleep(350);
-  const menuCat = await js(`(() => { const its = [...document.querySelectorAll('.ox-menu .ox-menuitem')];
-    const it = (t) => its.find((b) => b.querySelector('.ox-truncate').textContent === t);
-    return { n: its.length, dots: document.querySelectorAll('.ox-menu .ox-menuitem__dot').length,
-      rotulos: [...document.querySelectorAll('.ox-menu .ox-menu__label')].map((l) => l.textContent),
-      comida: it('Comida')?.querySelector('.ox-menuitem__key')?.textContent,
-      ropaApagada: !!it('Ropa')?.disabled }; })()`);
-  ok('el menú de categorías trae las dos listas con su puntito', menuCat.dots === 16 && menuCat.n === 17
-    && menuCat.rotulos.join() === 'Gastos,Ingresos', JSON.stringify(menuCat));
-  ok('cuenta los movimientos del mes y apaga las vacías', menuCat.comida === '1' && menuCat.ropaApagada, JSON.stringify(menuCat));
-  await js(`[...document.querySelectorAll('.ox-menu .ox-menuitem')].find((b) => b.textContent.trim().startsWith('Comida')).click()`);
-  await sleep(500);
-  const soloComida = await js(`[...document.querySelectorAll('#mv-rows .ox-tr .fw-cat')].map((c) => c.textContent.trim())`);
-  ok('elegir Comida deja solo filas de Comida', soloComida.length === 1 && soloComida[0] === 'Comida', JSON.stringify(soloComida));
-  ok('el select dice la categoría y el encabezado suma el total',
-    (await js(`document.querySelector('#mv-cat .ox-select__value').textContent`)) === 'Comida'
-    && /1 movimiento · \$/.test(await js(`document.querySelector('.ox-viewhead__sub').textContent`)),
-    await js(`document.querySelector('.ox-viewhead__sub').textContent`));
-  await click('#mv-filter [data-value="income"]');
-  await sleep(500);
-  ok('pasar a Ingresos suelta una categoría de gastos',
-    (await js(`document.querySelector('#mv-cat .ox-select__value').textContent`)) === 'Todas las categorías'
-    && (await js(`document.querySelectorAll('#mv-rows .ox-tr').length`)) === 1);
-  await click('#mv-filter [data-value="all"]');
-  await sleep(400);
-
-  const mesAntes = await js(`document.querySelector('.ox-viewhead__title').textContent.trim()`);
-  await click('[data-month="-1"]');
-  await sleep(700);
-  const mesDespues = await js(`document.querySelector('.ox-viewhead__title').textContent.trim()`);
-  ok('ir al mes anterior cambia el encabezado', mesAntes !== mesDespues, `${mesAntes} → ${mesDespues}`);
-  ok('y la titlebar lo sigue',
-    (await js(`document.getElementById('titlebar-context').textContent.trim()`)) === mesDespues);
-  ok('aparece el botón Hoy al salir del mes actual', await js(`!!document.querySelector('[data-month="hoy"]')`));
-  await click('[data-month="hoy"]');
-  await sleep(700);
-  ok('y volver a Hoy lo esconde de nuevo', !(await js(`!!document.querySelector('[data-month="hoy"]')`)));
-
-  console.log('\n9. Estado vacío');
-  for (let i = 0; i < 14; i++) await click('[data-month="-1"]');
-  await sleep(900);
-  ok('un mes sin movimientos muestra el vacío, no una tabla pelada',
-    await js(`!!document.querySelector('.ox-empty')`));
-  ok('el vacío trae la marca apagada', await js(`!!document.querySelector('.fw-mark--dim')`));
-  await click('[data-month="hoy"]');
-  await sleep(700);
-
-  console.log('\n9-bis. Ajustes: traer los datos de la app anterior');
-  /* El motivo por el que esta app existe: mudarse desde FinWatch sin perder
-     nada. Se prueba por la UI real —vista, botón, diálogo, modal— y no
-     llamando al importador de costado, porque el camino es lo que falla. */
-  await click('[data-view="ajustes"]');
-  await sleep(800);
-  ok('la vista de ajustes monta', (await js(`document.querySelectorAll('.ox-section').length`)) >= 2);
-  const totalAntes = await js(`window.fw.load().then((l) => l.length)`);
-  ok('dice cuántos movimientos hay',
-    await js(`[...document.querySelectorAll('.ox-kv__v')].some((v) => v.textContent.trim() === '${totalAntes}')`),
-    String(totalAntes));
-  ok('muestra la carpeta de datos', await js(`!!document.querySelector('.ox-kv__v.ox-mono[data-tip]')`));
-
-  ok('se pudo interceptar el diálogo de abrir', abrirInterceptado);
-  if (abrirInterceptado) {
-    await click('#aj-importar');
-    await sleep(1300);
-    const modalImp = await rect('.ox-modal');
-    ok('el resumen del import abre en un modal', !!modalImp && dentro(modalImp), JSON.stringify(modalImp));
-    const resumen = await js(`document.querySelector('.ox-modal')?.textContent || ''`);
-    ok('dice de qué app vino', /FinWatch/.test(resumen), resumen.slice(0, 140));
-    await click('.ox-modal .ox-btn--primary');
-    await sleep(800);
-
-    const totalDespues = await js(`window.fw.load().then((l) => l.length)`);
-    ok('entraron los dos válidos', totalDespues === totalAntes + 2, `${totalAntes} → ${totalDespues}`);
-    ok('la fila inválida NO entró', totalDespues !== totalAntes + 3);
-    ok('y son los de FinWatch',
-      await js(`window.fw.load().then((l) => l.some((m) => m.note === 'viene de FinWatch'))`));
-
-    /* Importar dos veces el mismo archivo es un error humano corriente y no
-       puede terminar en movimientos duplicados. */
-    await click('#aj-importar');
-    await sleep(1300);
-    const r2 = await js(`document.querySelector('.ox-modal')?.textContent || ''`);
-    ok('reimportar avisa que no entró nada nuevo', /No entró nada nuevo/.test(r2), r2.slice(0, 140));
-    await click('.ox-modal .ox-btn--primary');
-    await sleep(700);
-    ok('y el total no se movió',
-      (await js(`window.fw.load().then((l) => l.length)`)) === totalDespues, String(totalDespues));
-  }
-  console.log('\n9-ter. Calculadora: filas a mano y su suma');
-  await click('[data-view="calculadora"]');
-  await sleep(800);
-  ok('la calculadora monta con tres filas vacías', (await js(`document.querySelectorAll('.fw-calc__row').length`)) === 3);
-  const escribir = (i, campo, valor) => js(`(() => {
-    const el = document.querySelectorAll('.fw-calc__row')[${i}].querySelector('[data-campo="${campo}"]');
-    el.focus(); el.value = ${JSON.stringify(valor)};
-    el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
-  // fmtARS separa el $ con un espacio fino (U+2009): se normaliza para comparar.
-  const totalCalc = (n = 0) => js(`document.querySelectorAll('.fw-calc__total')[${n}].textContent.replace(/\\s/g, ' ')`);
-
-  await escribir(0, 'concepto', 'Alquiler');
-  await escribir(0, 'monto', '250.000');
-  await escribir(1, 'monto', '1.234,50');
-  await escribir(2, 'monto', '15500');
-  ok('suma los formatos que acepta la carga ($ 266.734,5)', (await totalCalc()) === '$ 266.734,5', await totalCalc());
-
-  await escribir(2, 'monto', 'quince mil');
-  ok('un monto que no se entiende no suma', (await totalCalc()) === '$ 251.234,5', await totalCalc());
-  ok('y queda marcado en la fila', await js(`document.querySelectorAll('.fw-calc__input.is-invalid').length === 1`));
-  ok('y el pie lo dice', /sin entender/.test(await js(`document.querySelector('.fw-calc__detalle').textContent`)));
-  await escribir(2, 'monto', '15500');
-
-  /* Enter en el último monto agrega una fila y deja el cursor ahí: es lo que
-     permite cargar una lista larga sin tocar el mouse. Tecla REAL, no un
-     evento sintético, para probar el camino que usa Fran. */
-  await js(`document.querySelectorAll('.fw-calc__row')[2].querySelector('[data-campo="monto"]').focus()`);
-  win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Enter' });
-  win.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' });
-  await sleep(500);
-  ok('Enter en el último monto agrega una fila', (await js(`document.querySelectorAll('.fw-calc__row').length`)) === 4);
-  ok('y el cursor queda en su concepto',
-    await js(`document.activeElement === document.querySelectorAll('.fw-calc__row')[3].querySelector('[data-campo="concepto"]')`));
-
-  const filasAntes = await js(`document.querySelectorAll('.fw-calc__row').length`);
-  await click('.fw-calc__row:nth-child(2) [data-borrar]');
-  await sleep(500);
-  ok('borrar una fila la saca (con su salida animada)',
-    (await js(`document.querySelectorAll('.fw-calc__row').length`)) === filasAntes - 1);
-  ok('y el total la descuenta', (await totalCalc()) === '$ 265.500', await totalCalc());
-
-  /* Irse de la vista guarda lo pendiente sin esperar la demora, y la vuelta
-     trae lo mismo. Volver es también lo que delata un listener duplicado: un
-     click en «Agregar fila» tiene que agregar UNA. */
-  await click('[data-view="resumen"]');
-  await sleep(600);
-  const calcEnDisco = JSON.parse(fs.readFileSync(path.join(tmp, 'calculadora.json'), 'utf8'));
-  const filasEnDisco = calcEnDisco.calculadoras?.[0]?.filas;
-  ok('se guardó en calculadora.json al salir', filasEnDisco?.length === 3, JSON.stringify(calcEnDisco).slice(0, 160));
-  ok('el monto se guarda como se escribió', filasEnDisco?.[0]?.monto === '250.000', filasEnDisco?.[0]?.monto);
-  ok('y no tocó los movimientos',
-    !(await js(`window.fw.load().then((l) => l.some((m) => /Alquiler/.test(m.note || '')))`)));
-  await click('[data-view="calculadora"]');
-  await sleep(700);
-  ok('al volver están las mismas filas', (await totalCalc()) === '$ 265.500', await totalCalc());
-  const n0 = await js(`document.querySelectorAll('.fw-calc__row').length`);
-  await click('.fw-calc__agregar');
+  // Borrar: Supr pide confirmación.
+  await js(`[...document.querySelectorAll('.fw-ledger__r')].find((r) => /prueba humo/.test(r.textContent))?.click()`);
   await sleep(300);
-  ok('«Agregar fila» agrega una sola tras volver a la vista',
-    (await js(`document.querySelectorAll('.fw-calc__row').length`)) === n0 + 1);
-  const filaR = await rect('.fw-calc__row:last-child');
-  ok('la fila nueva cae dentro de la ventana', dentro(filaR), JSON.stringify(filaR));
+  await tecla('Delete');
+  await sleep(600);
+  ok('Supr pide confirmación', /Borrar/.test(await js(`document.querySelector('.ox-modal__title')?.textContent || ''`)));
+  await js(`[...document.querySelectorAll('.ox-modal__foot .ox-btn')].find((b) => /Borrar/i.test(b.textContent))?.click()`);
+  await sleep(1000);
+  ok('borrar lo saca del disco', !movs().some((m) => m.note === 'prueba humo'));
+  ok('y del libro', (await filasLibro()) === 3, String(await filasLibro()));
 
-  /* Copiar deja la tabla en el portapapeles separada por tabs: solo lo
-     cargado, con encabezado y total. */
-  /* El portapapeles es el del sistema y sobrevive entre corridas: se vacía
-     antes y se espera a que llegue lo nuevo, que la escritura es asíncrona.
-     Windows guarda los saltos como \r\n. */
-  const copiarYLeer = async () => {
-    clipboard.writeText('');
-    await click('.fw-calc__copiar');
-    for (let i = 0; i < 20 && !clipboard.readText(); i++) await sleep(100);
-    return clipboard.readText().replace(/\r\n/g, '\n');
-  };
-  const copiado = await copiarYLeer();
-  ok('«Copiar» deja la tabla en el portapapeles',
-    copiado === 'Concepto\tMonto\nAlquiler\t250.000\n\t15500\nTotal\t$ 265.500', JSON.stringify(copiado));
-
-  /* El título es opcional: vacío, el placeholder la nombra por su lugar; con
-     texto, se guarda y encabeza la tabla copiada. */
-  ok('sin título, se llama por su lugar',
-    (await js(`document.querySelector('.fw-calc__titulo').placeholder`)) === 'Calculadora 1');
-  await js(`(() => { const el = document.querySelector('.fw-calc__titulo');
-    el.focus(); el.value = 'Mudanza'; el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
-  const copiadoConTitulo = await copiarYLeer();
-  ok('el título encabeza la tabla copiada',
-    copiadoConTitulo.startsWith('Mudanza\nConcepto\tMonto\n'), JSON.stringify(copiadoConTitulo));
-
-  /* Hasta seis calculadoras, cada una con su propia cuenta. */
-  ok('con una sola, la X de cerrar no está a mano',
-    await js(`getComputedStyle(document.querySelector('.fw-calc__cerrar')).visibility === 'hidden'`));
-  for (let i = 0; i < 5; i++) { await click('#calc-nueva'); await sleep(300); }
-  ok('se abren hasta seis calculadoras', (await js(`document.querySelectorAll('.fw-calc').length`)) === 6);
-  ok('y en la sexta el botón se deshabilita', await js(`document.getElementById('calc-nueva').disabled`));
-  ok('las nuevas se nombran por su lugar, la titulada conserva el suyo',
-    (await js(`[...document.querySelectorAll('.fw-calc__titulo')].map((n) => n.value || n.placeholder).join('|')`))
-      === 'Mudanza|Calculadora 2|Calculadora 3|Calculadora 4|Calculadora 5|Calculadora 6');
-  await js(`(() => {
-    const el = document.querySelectorAll('.fw-calc')[1].querySelector('[data-campo="monto"]');
-    el.focus(); el.value = '1000'; el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
-  ok('la segunda suma aparte', (await totalCalc(1)) === '$ 1.000', await totalCalc(1));
-  ok('y la primera no se mueve', (await totalCalc(0)) === '$ 265.500', await totalCalc(0));
-
-  await click('.fw-calc:nth-child(6) .fw-calc__cerrar');
+  // El menú contextual de una fila.
+  await js(`(() => { const r = document.querySelector('.fw-ledger__r'); const b = r.getBoundingClientRect();
+    r.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: b.x + 200, clientY: b.y + 10 })); })()`);
   await sleep(500);
-  ok('cerrar una vacía no pregunta', (await js(`document.querySelectorAll('.fw-calc').length`)) === 5
-    && !(await js(`!!document.querySelector('.ox-modal')`)));
-  ok('y el botón vuelve a estar disponible', !(await js(`document.getElementById('calc-nueva').disabled`)));
-  await click('.fw-calc:nth-child(2) .fw-calc__cerrar');
-  await sleep(600);
-  ok('cerrar una con datos pide confirmación', dentro(await rect('.ox-modal')));
-  await click('.ox-modal .ox-btn--danger-solid');
-  await sleep(800);
-  ok('y se va, dejando las demás', (await js(`document.querySelectorAll('.fw-calc').length`)) === 4
-    && (await totalCalc(0)) === '$ 265.500', await totalCalc(0));
-  for (let i = 0; i < 3; i++) { await click('.fw-calc:nth-child(2) .fw-calc__cerrar'); await sleep(600); }
-  ok('queda una sola y sin X', (await js(`document.querySelectorAll('.fw-calc').length`)) === 1);
+  ok('el clic derecho abre el menú de la fila adentro de la ventana', dentro(await rect('.ox-menu')));
+  await tecla('Escape');
+  await sleep(400);
 
-  await click('[data-view="resumen"]');
-  await sleep(600);
-  const calcsEnDisco = JSON.parse(fs.readFileSync(path.join(tmp, 'calculadora.json'), 'utf8')).calculadoras;
-  ok('en disco queda una sola calculadora, con su título',
-    calcsEnDisco?.length === 1 && calcsEnDisco[0].titulo === 'Mudanza', JSON.stringify(calcsEnDisco).slice(0, 160));
-  await click('[data-view="calculadora"]');
-  await sleep(700);
-
-  await click('.fw-calc__vaciar');
-  await sleep(600);
-  ok('vaciar pide confirmación', dentro(await rect('.ox-modal')));
-  await click('.ox-modal .ox-btn--danger-solid');
-  await sleep(800);
-  ok('y deja tres filas vacías en $ 0', (await js(`document.querySelectorAll('.fw-calc__row').length`)) === 3
-    && (await totalCalc()) === '$ 0', await totalCalc());
-
-  await click('[data-view="movimientos"]');
-  await sleep(700);
-
-  console.log('\n9-quater. El encabezado de la tabla queda clavado arriba');
-  /* El th sticky se enganchaba al borde del CONTENIDO del scroller, debajo del
-     padding del esfumado: al scrollear bajaba con la tabla y las filas pasaban
-     por el hueco de arriba, por encima de los títulos. Con los datos del humo
-     la tabla no scrollea, así que se clonan filas solo en el DOM. Desde el
-     arreglo de Onyx el encabezado arranca debajo del respiro del esfumado y
-     sube con el contenido hasta clavarse contra el borde; mientras está
-     clavado, el scroller lleva .is-stuck-head y apaga el fade de arriba. */
-  const clavado = await js(`(async () => {
-    const body = document.getElementById('mv-rows');
-    const fila = body.querySelector('.ox-tr');
-    for (let i = 0; i < 60; i++) body.appendChild(fila.cloneNode(true));
-    const sc = body.closest('.ox-scroll');
-    const th = sc.querySelector('th');
-    const antes = th.getBoundingClientRect().top;
-    sc.scrollTop = 400;
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const caja = sc.getBoundingClientRect().top;
-    const t = th.getBoundingClientRect();
-    const asoman = [...body.querySelectorAll('.ox-tr')].filter((f) => {
-      // Lo que se VE de la fila entre el borde del scroll y los títulos.
-      const r = f.getBoundingClientRect(); return Math.min(r.bottom, t.top) - Math.max(r.top, caja) > 1; }).length;
-    const res = { antes, despues: t.top, caja, asoman, scrolleo: sc.scrollTop,
-      stuck: sc.classList.contains('is-stuck-head'), fadeTop: getComputedStyle(sc).getPropertyValue('--ox-fade-top').trim() };
-    sc.scrollTop = 0;
-    return res;
-  })()`);
-  ok('la tabla de verdad scrolleó', clavado.scrolleo > 0, JSON.stringify(clavado));
-  ok('y está pegado al borde de arriba del scroll', Math.abs(clavado.despues - clavado.caja) < 1, JSON.stringify(clavado));
-  ok('ninguna fila asoma por encima de los títulos', clavado.asoman === 0, JSON.stringify(clavado));
-  ok('clavado, el fade de arriba se apaga (la línea es el límite)', clavado.stuck && clavado.fadeTop === '0px', JSON.stringify(clavado));
-  await click('[data-view="resumen"]');
+  // Exportar todo a un respaldo.
+  await click('#mov-exp');
   await sleep(500);
-  await click('[data-view="movimientos"]');
-  await sleep(700);
+  await js(`[...document.querySelectorAll('.ox-menuitem')].find((b) => /respaldo/i.test(b.textContent))?.click()`);
+  await sleep(1000);
+  ok('exportar el respaldo escribe el archivo', fs.existsSync(destinoBackup));
 
-  console.log('\n9-quinquies. Presupuestos');
-  const leerDoc = (n) => { try { return JSON.parse(fs.readFileSync(path.join(tmp, `${n}.json`), 'utf8')); } catch { return null; } };
-  const tipear = (sel, valor) => js(`(() => { const i = document.querySelector(${JSON.stringify(sel)});
-    if (!i) return false; i.focus(); i.value = ${JSON.stringify(valor)};
-    i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-  await click('[data-view="presupuestos"]');
-  await sleep(800);
-  ok('monta una fila por categoría de gasto', (await js(`document.querySelectorAll('.fw-budget__row').length`)) === 11);
-  ok('sin topes, explica qué hacer', await js(`!!document.querySelector('.fw-budget__intro')`));
-  ok('el encabezado lleva su línea', await js(`!!document.querySelector('.ox-viewhead--line')`));
-  await tipear('[data-tope="comida"]', '10.000');
+  console.log('\n7. Ctrl+N: el formulario completo');
+  await tecla('n', ['control']);
   await sleep(700);
-  ok('un tope por debajo de lo gastado marca la fila como pasada',
-    await js(`document.querySelector('.fw-budget__row[data-cat="comida"]').classList.contains('is-over')`));
-  ok('y la barra se pone roja', await js(`!!document.querySelector('[data-cat="comida"] .ox-meter--danger')`));
-  // fmtARS separa el $ con un espacio que no corta: se normaliza para comparar.
-  const textoComida = (await js(`document.querySelector('[data-cat="comida"] .fw-budget__text').textContent`)).replace(/\s/g, ' ');
-  ok('y dice cuánto se pasó', textoComida.includes('te pasaste $ 2.500'), textoComida);
-  ok('aparecen los números del presupuesto', await js(`!!document.querySelector('#bg-kpis [data-k="queda"]')`));
-  ok('el cursor sigue en el campo mientras se tipea', await js(`document.activeElement?.dataset.tope === 'comida'`));
-  ok('el tope quedó en disco', leerDoc('presupuestos')?.topes?.comida === 10000, JSON.stringify(leerDoc('presupuestos')));
-  await tipear('[data-tope="comida"]', 'abc');
-  await sleep(600);
-  ok('un tope que no se entiende se marca y no se guarda',
-    (await js(`document.querySelector('[data-tope="comida"]').classList.contains('is-invalid')`))
-    && leerDoc('presupuestos')?.topes?.comida === 10000);
-  await tipear('[data-tope="comida"]', '');
-  await sleep(700);
-  ok('vaciar el campo saca el tope', leerDoc('presupuestos')?.topes?.comida === undefined, JSON.stringify(leerDoc('presupuestos')));
+  ok('Ctrl+N abre un movimiento nuevo', /Nuevo/.test(await js(`document.querySelector('.ox-modal__title')?.textContent || ''`)));
+  await escribir('#qa-amount', '777');
+  await tecla('Return');
+  await sleep(1000);
+  ok('y Enter lo guarda', movs().some((m) => m.amount === 777));
 
-  console.log('\n9-sexies. Metas');
-  await click('[data-view="metas"]');
+  console.log('\n8. F3 Presupuestos');
+  await tecla('F3');
+  await sleep(900);
+  ok('una fila por categoría de gasto', (await js(`document.querySelectorAll('.fw-topes__r').length`)) === 11);
+  await escribir('[data-tope="comida"]', '10000');
   await sleep(800);
-  ok('sin metas, un estado vacío con su botón', await js(`!!document.querySelector('#mt-primera')`));
+  ok('un tope que se pasa: PASADO', /PASADO/.test(await js(`document.querySelector('[data-cat="comida"] [data-c="est"]').textContent`)));
+  ok('el medidor de esa fila se llenó', (await js(`document.querySelector('[data-cat="comida"] .fw-meter').dataset.p`)) === '1');
+  ok('el global ya tiene presupuestado', (await js(`document.getElementById('g-pres').dataset.v`)) === '10000');
+  await sleep(900);
+  ok('la lectura lo dice en criollo', /COMIDA/.test(await js(`document.getElementById('pre-lect-ul').textContent`)));
+  await js(`document.activeElement.blur()`);
+  await tecla('F1');
+  await sleep(800);
+  ok('el tope se guardó (presupuestos.json)', leerDoc('presupuestos')?.topes?.comida === 10000, JSON.stringify(leerDoc('presupuestos')));
+
+  console.log('\n9. F4 Metas');
+  await tecla('F4');
+  await sleep(800);
   await click('#mt-primera');
   await sleep(600);
-  ok('el formulario abre dentro de la ventana', dentro(await rect('.ox-modal')));
-  ok('y arranca escribiendo el nombre', await js(`document.activeElement?.dataset.f === 'nombre'`));
-  const confirmar = () => js(`document.querySelector('.ox-modal__foot .ox-btn--primary')?.disabled`);
-  ok('vacío no se puede crear', (await confirmar()) === true);
-  await tipear('[data-f="nombre"]', 'Viaje de humo');
-  await tipear('[data-f="objetivo"]', '100.000');
-  await sleep(150);
-  ok('completo sí', (await confirmar()) === false);
-  await click('.ox-modal__foot .ox-btn--primary');
-  await sleep(900);
-  ok('la meta aparece en su tarjeta', (await js(`document.querySelectorAll('.fw-meta').length`)) === 1);
-  ok('y queda en disco', leerDoc('metas')?.metas?.[0]?.objetivo === 100000, JSON.stringify(leerDoc('metas')));
-
-  // Ir y volver: un listener enganchado de más abriría dos modales con un click.
-  await click('[data-view="resumen"]');
-  await sleep(500);
-  await click('[data-view="metas"]');
-  await sleep(800);
-  await click('[data-accion="aportar"]');
-  await sleep(600);
-  ok('al volver, aportar abre UN solo diálogo', (await js(`document.querySelectorAll('.ox-modal').length`)) === 1);
-  await tipear('[data-f="monto"]', '25.000');
-  await sleep(150);
-  await click('.ox-modal__foot .ox-btn--primary');
-  await sleep(900);
-  const ahorrado = (await js(`document.querySelector('.fw-meta__ahorrado').textContent.trim()`)).replace(/\s/g, ' ');
-  ok('el aporte suma', ahorrado === '$ 25.000', ahorrado);
-  ok('y se ve en la lista', (await js(`document.querySelectorAll('.fw-meta__aporte').length`)) === 1);
-  ok('y queda en disco', leerDoc('metas')?.metas?.[0]?.aportes?.length === 1);
-  await click('[data-accion="retirar"]');
-  await sleep(600);
-  await tipear('[data-f="monto"]', '30.000');
-  await sleep(150);
-  ok('no deja retirar más de lo juntado', (await confirmar()) === true);
-  await escape();
-  await sleep(500);
-  await click('[data-accion="menu"]');
-  await sleep(400);
-  await js(`[...document.querySelectorAll('.ox-menuitem')].find((b) => b.textContent.includes('Borrar'))?.click()`);
-  await sleep(600);
-  await click('.ox-modal .ox-btn--danger-solid');
-  await sleep(1000);
-  ok('borrar la meta vuelve al estado vacío', await js(`!!document.querySelector('#mt-primera')`));
-  ok('y la saca del disco', leerDoc('metas')?.metas?.length === 0);
-
-  await click('[data-view="movimientos"]');
-  await sleep(700);
-
-  console.log('\n10. Nada nativo de Chromium, nada de glifos');
-  ok('ningún title= nativo', (await js(`document.querySelectorAll('[title]').length`)) === 0,
-    await js(`[...document.querySelectorAll('[title]')].map(e => e.tagName).join(', ')`));
-
-  /* base.css resetea el padding de fábrica del <button> pero no su background:
-     sin `color-scheme` declarado, un botón que no declara el suyo hereda
-     `buttonface` —rgb(240,240,240), el gris del tema claro de Windows— y se
-     pinta un cuadradito claro en una app que es solo oscura. No se ve en el
-     DOM ni en el HTML: hay que medir el estilo computado. Pasó con cada día
-     del calendario. Se permiten los claros a propósito: el botón primario
-     lleva el acento, que en esta paleta ES la luz. */
-  // Con el calendario abierto: sus 42 días son botones y fue donde apareció.
-  await click('#qa-dp-field');
+  await escribir('.ox-modal [data-f="nombre"]', 'Viaje de prueba');
+  await escribir('.ox-modal [data-f="objetivo"]', '50000');
+  await sleep(200);
+  await js(`[...document.querySelectorAll('.ox-modal__foot .ox-btn')].find((b) => /Crear/i.test(b.textContent))?.click()`);
+  await sleep(1300);
+  ok('crear una meta la pone en pantalla', (await js(`document.querySelectorAll('.fw-met__ficha').length`)) === 1);
+  ok('y en metas.json', leerDoc('metas')?.metas?.[0]?.nombre === 'Viaje de prueba');
+  await click('.fw-met__ficha [data-accion="aportar"]');
   await sleep(450);
-  const fondosUA = await js(`(() => {
-    const permitidos = /ox-btn--primary|ox-btn--danger-solid|fw-cat-btn|ox-segmented__opt|ox-switch|ox-check|ox-slider/;
-    return [...document.querySelectorAll('button')]
-      .filter((b) => !permitidos.test(b.className))
-      .map((b) => ({ id: b.className || b.id || 'button', bg: getComputedStyle(b).backgroundColor }))
-      .filter((x) => x.bg === 'rgb(240, 240, 240)')
-      .map((x) => x.id);
-  })()`);
-  ok('ningún botón heredó el fondo de fábrica de Chromium',
-    fondosUA.length === 0, [...new Set(fondosUA)].join(' | '));
+  await escribir('.fw-met__ficha [data-f="monto"]', '20000');
+  await js(`document.querySelector('.fw-met__ficha [data-f="monto"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
+  await sleep(1200);
+  ok('aportar en la ficha suma (20.000 de 50.000)', /20\.000/.test(await js(`document.querySelector('.fw-meta__ah')?.textContent || ''`)));
+  ok('y queda en metas.json', leerDoc('metas')?.metas?.[0]?.aportes?.[0]?.monto === 20000);
+  await click('.fw-met__ficha [data-accion="retirar"]');
+  await sleep(450);
+  await escribir('.fw-met__ficha [data-f="monto"]', '99999');
+  await sleep(300);
+  ok('retirar más de lo ahorrado no se deja', /NO PODÉS/.test(await js(`document.querySelector('.fw-meta__hint').textContent`)));
+  await js(`document.querySelector('.fw-met__ficha [data-f="monto"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  await sleep(300);
 
-  /* El gemelo del anterior: Chromium también le da a todo <button> un
-     `border: 2px outset`. Salía como un reborde biselado alrededor de cada
-     chip de categoría y del campo de fecha. */
-  const bordesUA = await js(`(() => [...document.querySelectorAll('button')]
-    .filter((b) => getComputedStyle(b).borderStyle === 'outset')
-    .map((b) => b.className || b.id || 'button'))()`);
-  ok('ningún botón heredó el borde de fábrica de Chromium',
-    bordesUA.length === 0, [...new Set(bordesUA)].join(' | '));
-  ok('y el barrido incluyó los días del calendario',
-    (await js(`document.querySelectorAll('.fw-dp__day').length`)) === 42);
-  await tap('#qa-dp-field');
-  await sleep(400);
-  /* Todo símbolo es un SVG propio. Se permiten los tipográficos que SÍ son
-     texto: el menos real (−), el separador (·) y las comillas. */
-  const glifos = await js(`(() => {
-    const malos = /[\\u2190-\\u21FF\\u2700-\\u27BF\\u2B00-\\u2BFF\\uFE0F\\u2600-\\u26FF]|[\\uD83C-\\uDBFF][\\uDC00-\\uDFFF]/;
-    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    const out = [];
-    while (w.nextNode()) { const t = w.currentNode.nodeValue; if (malos.test(t)) out.push(t.trim().slice(0, 40)); }
-    return out;
-  })()`);
-  ok('cero emojis y cero flechas unicode en la UI', glifos.length === 0, glifos.join(' | '));
-
-  console.log('\n11. El esfumado del scroll, lado por lado');
-  /* La vista corta al aire arriba (contra el encabezado) pero abajo muere
-     contra la línea de la statusbar: ese lado NO lleva fade. */
-  await click('[data-view="resumen"]');
-  await sleep(700);
-  const mask = await js(`getComputedStyle(document.querySelector('.ox-main > .ox-scroll')).maskImage`);
-  ok('la vista con scroll tiene máscara', mask && mask !== 'none', String(mask));
-  const fadeBottom = await js(`getComputedStyle(document.querySelector('.ox-main > .ox-scroll')).getPropertyValue('--ox-fade-bottom').trim()`);
-  ok('y el lado de abajo está apagado (lo cierra la statusbar)', fadeBottom === '0px', `"${fadeBottom}"`);
-
-  /* ── 11-bis. Ningún anillo de foco se corta ─────────────────────────────────
-     El anillo de base.css sale 3.5px por fuera del elemento. Si el elemento se
-     ve entero pero esos 3.5px caen afuera de un contenedor que recorta (un
-     .ox-scroll, el borde de la ventana) o encima del canto de una superficie
-     (una card, el carril del segmentado), con Tab se ve cortado: pasó en los
-     controles de ventana, el primer ítem del rail, el segmentado y las filas
-     de una tabla de borde a borde (Apex, sep 2026). Cada elemento se enfoca
-     como con teclado y se mide su anillo real (solo las sombras duras: una
-     difusa es elevación, no anillo), así los que van hacia adentro cuentan
-     cero. Las filas de tabla se prueban como si tuvieran tabindex, porque las
-     apps se lo ponen. Traído de Onyx (test/renderer.test.cjs). */
-  console.log('\n11-bis. Ningún anillo de foco se corta');
-  const AUDITAR_ANILLOS = `((scope) => {
-  if (!document.getElementById('aud-notr')) document.head.insertAdjacentHTML('beforeend', '<style id="aud-notr">*,*::before{transition:none!important}</style>');
-  // Cuánto sale el anillo REAL por fuera del elemento: se lo enfoca como con
-  // teclado y se leen sus sombras de afuera y su outline.
-  const extent = (el) => {
-    el.focus({ focusVisible: true, preventScroll: true });
-    const s = getComputedStyle(el);
-    let m = 0;
-    for (const part of s.boxShadow.split(/,(?![^(]*\\))/)) {
-      if (part.includes('inset') || part.trim() === 'none') continue;
-      const nums = part.replace(/rgba?\\([^)]*\\)|oklch\\([^)]*\\)/g, '').match(/-?[\\d.]+px/g) || [];
-      const [x = 0, y = 0, blur = 0, spread = 0] = nums.map(parseFloat);
-      if (blur > 0) continue;   // una sombra difusa (elevación, brillo) no es el anillo
-      m = Math.max(m, spread + Math.max(Math.abs(x), Math.abs(y)));
-    }
-    if (s.outlineStyle !== 'none' && !/rgba\\(0, 0, 0, 0\\)/.test(s.outlineColor)) m = Math.max(m, parseFloat(s.outlineWidth) + parseFloat(s.outlineOffset));
-    el.blur();
-    return m;
-  };
-  const SEL = 'a[href],button:not([disabled]):not([tabindex="-1"]),input:not([disabled]):not([type=hidden]),select,textarea,[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
-  const name = (el) => {
-    const id = el.id ? '#' + el.id : '';
-    const cls = [...el.classList].slice(0, 2).map((c) => '.' + c).join('');
-    const txt = (el.getAttribute('aria-label') || el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 24);
-    return el.tagName.toLowerCase() + id + cls + (txt ? ' «' + txt + '»' : '');
-  };
-  const out = [];
-  for (const el of scope.querySelectorAll(SEL)) {
-    if (el.closest('[inert],[hidden],[aria-hidden="true"]')) continue;
-    const cs = getComputedStyle(el);
-    if (cs.visibility === 'hidden' || cs.display === 'none') continue;
-    el.scrollIntoView({ block: 'center', inline: 'center' });
-    const r = el.getBoundingClientRect();
-    if (r.width < 2 || r.height < 2) continue;
-    const R = extent(el);
-    if (R <= 0.5) continue;
-    const boxes = [{ who: 'ventana', l: 0, t: 0, r: innerWidth, b: innerHeight }];
-    for (let a = el.parentElement; a && a !== document.documentElement; a = a.parentElement) {
-      const s = getComputedStyle(a);
-      if (s.overflowX !== 'visible' || s.overflowY !== 'visible' || s.clipPath !== 'none' || /paint|strict|content/.test(s.contain)) {
-        const ar = a.getBoundingClientRect();
-        const l = ar.left + a.clientLeft; const t = ar.top + a.clientTop;
-        boxes.push({ who: name(a), l, t, r: l + a.clientWidth, b: t + a.clientHeight });
-      }
-    }
-    const e = 0.5;
-    // ¿Roza el canto de una superficie (card, panel, modal)? Un fondo o una
-    // sombra con radio: el anillo se pisa con su borde aunque nada lo recorte.
-    for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
-      const s = getComputedStyle(a);
-      const surf = (s.backgroundColor !== 'rgba(0, 0, 0, 0)' || s.boxShadow !== 'none') && parseFloat(s.borderTopLeftRadius) > 0;
-      if (!surf) continue;
-      const ar = a.getBoundingClientRect();
-      const g = [r.left - ar.left, r.top - ar.top, ar.right - r.right, ar.bottom - r.bottom];
-      if (g.some((x) => x < -e)) continue;
-      const lados = ['izq', 'arriba', 'der', 'abajo'].filter((_, i) => g[i] < R - e).map((n, i) => n);
-      const det = g.map((x, i) => ['izq', 'arriba', 'der', 'abajo'][i] + ' ' + x.toFixed(1)).filter((_, i) => g[i] < R - e);
-      if (det.length) { out.push(name(el) + '  roza ' + name(a) + '  [' + det.join(', ') + ']'); break; }
-    }
-    for (const bx of boxes) {
-      const inside = r.left >= bx.l - e && r.top >= bx.t - e && r.right <= bx.r + e && r.bottom <= bx.b + e;
-      if (!inside) break;   // el elemento mismo ya está recortado: no es culpa del anillo
-      const lados = [];
-      if (r.left - R < bx.l - e) lados.push('izq ' + (r.left - bx.l).toFixed(1));
-      if (r.top - R < bx.t - e) lados.push('arriba ' + (r.top - bx.t).toFixed(1));
-      if (r.right + R > bx.r + e) lados.push('der ' + (bx.r - r.right).toFixed(1));
-      if (r.bottom + R > bx.b + e) lados.push('abajo ' + (bx.b - r.bottom).toFixed(1));
-      if (lados.length) { out.push(name(el) + '  ← ' + bx.who + '  [' + lados.join(', ') + ']'); break; }
-    }
-  }
-  document.querySelectorAll('.ox-scroll, .ox-main, [class*="scroll"]').forEach((s) => { s.scrollTop = 0; s.scrollLeft = 0; });
-  return out;
-})(document)`;
-  for (const v of ['resumen', 'movimientos', 'presupuestos', 'metas', 'calculadora', 'ajustes']) {
-    await click(`[data-view="${v}"]`);
-    await sleep(700);
-    await js(`document.querySelectorAll('#view tbody tr').forEach((tr) => tr.tabIndex = 0)`);
-    const cortes = await js(AUDITAR_ANILLOS);
-    ok(`${v}: ningún anillo de foco se corta ni roza un canto`, cortes.length === 0, '\n      ' + cortes.join('\n      '));
-  }
-  await js(`document.getElementById('aud-notr')?.remove()`);
-
-
-  /* ── 11-ter. El movimiento, medido ─────────────────────────────────────────
-     La auditoría de Finway contra Onyx (octubre 2026) encontró lo que cambiaba
-     de golpe: repintados en seco que hacían volver a entrar todo, la tabla que
-     se rehacía al filtrar, el formulario que se rehacía al editar, siete
-     animaciones que no animaban. Cada caso se muestrea en la página, cuadro por
-     cuadro: a ojo, a 60 fps, no se ve. */
-  console.log('\n11-bis. El movimiento, medido');
-
-  // `animation:` con el nombre de una CLASE (ox-in-fade) en vez del @keyframes
-  // (ox-fade-in) no anima nada y no avisa. Se recorren las reglas, no los
-  // elementos: así también cuenta lo que hoy no está en pantalla.
-  const huerfanas = await js(`(() => {
-    const existen = new Set();
-    const hojas = [...document.styleSheets].flatMap((h) => { try { return [[h, h.cssRules]]; } catch { return []; } });
-    const recorrer = (rs, fn) => { for (const r of rs) { fn(r); if (r.cssRules) recorrer(r.cssRules, fn); } };
-    for (const [, rs] of hojas) recorrer(rs, (r) => { if (r instanceof CSSKeyframesRule) existen.add(r.name); });
-    const CLAVES = new Set(['none', 'both', 'forwards', 'backwards', 'infinite', 'alternate', 'reverse',
-      'alternate-reverse', 'normal', 'running', 'paused', 'linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out',
-      'step-start', 'step-end', 'initial', 'inherit', 'unset', 'revert']);
-    const malas = [];
-    for (const [h, rs] of hojas) recorrer(rs, (r) => {
-      if (!r.style) return;
-      const v = r.style.getPropertyValue('animation-name') || r.style.getPropertyValue('animation');
-      v.replace(/[\\w-]+\\([^()]*(\\([^()]*\\)[^()]*)*\\)/g, ' ').split(/[\\s,]+/)
-        .filter((t) => /^-?[a-z_][\\w-]*$/i.test(t) && !CLAVES.has(t.toLowerCase()) && !existen.has(t))
-        .forEach((n) => malas.push((h.href || '').split('/').pop() + ' ' + r.selectorText + ' → ' + n));
-    });
-    return malas;
-  })()`);
-  ok('ninguna animación nombra un @keyframes que no existe', huerfanas.length === 0, huerfanas.join(' | '));
-
-  /* Repintar Resumen (cambiar de mes, guardar) es un fundido, y lo nuevo queda
-     asentado: el donut, las barras y las líneas no vuelven a entrar. */
-  await click('[data-view="resumen"]');
-  await sleep(900);
-  const repinte = await js(`(async () => {
-    const Router = (await import('./js/router.js')).default;
-    const view = document.getElementById('view');
-    Router.refresh();
-    const calco = document.querySelector('.ox-main--saliente');
-    await Promise.resolve();
-    const corriendo = view.getAnimations({ subtree: true }).filter((a) => !(a instanceof CSSTransition)
-      && a.playState === 'running' && a.effect?.target !== view
-      && a.effect?.getTiming().iterations !== Infinity).map((a) => a.animationName || a.effect?.target?.className?.baseVal || a.effect?.target?.className);
-    await new Promise((r) => setTimeout(r, 400));
-    return { calco: !!calco, corriendo, calcos: document.querySelectorAll('.ox-main--saliente').length };
-  })()`);
-  ok('repintar Resumen es un fundido (lo de antes en un calco)', repinte.calco && repinte.calcos === 0, JSON.stringify(repinte));
-  ok('y los gráficos no vuelven a entrar', repinte.corriendo.length === 0, JSON.stringify(repinte.corriendo));
-
-  /* Volver a la ventana con los mismos datos en disco no repinta nada. Antes
-     se repintaba la vista entera en cada vuelta del foco. */
-  const vuelta = await js(`(async () => {
-    const cabeza = document.querySelector('#view .ox-viewhead');
-    window.dispatchEvent(new Event('focus'));
-    await new Promise((r) => setTimeout(r, 600));
-    return { misma: document.querySelector('#view .ox-viewhead') === cabeza };
-  })()`);
-  ok('recuperar el foco sin cambios en disco no repinta la vista', vuelta.misma, JSON.stringify(vuelta));
-
-  await click('[data-view="movimientos"]');
-  await sleep(900);
-
-  /* Filtrar: las filas que siguen son el MISMO nodo (no vuelven a entrar) y las
-     que se van se esfuman fuera del flujo, con el ancho de sus celdas. Antes:
-     innerHTML del tbody y todas re-entrando escalonadas; después, un fundido
-     de la tabla entera, en el que las filas que cambiaban de lugar se cruzaban. */
-  const filtro = await js(`(async () => {
-    const tbody = document.getElementById('mv-rows');
-    const vivas = () => [...tbody.querySelectorAll(':scope > .ox-tr:not([data-state="closing"])')];
-    const antes = new Map(vivas().map((tr) => [tr.dataset.id, tr]));
-    const celdas = (tr) => [...tr.cells].map((c) => Math.round(c.getBoundingClientRect().width));
-    const anchosAntes = new Map([...antes].map(([id, tr]) => [id, celdas(tr)]));
-    document.querySelector('#mv-filter [data-value="expense"]').click();
-    const saliendo = [...tbody.querySelectorAll(':scope > [data-state="closing"]')];
-    const quedan = vivas();
-    const r = {
-      saliendo: saliendo.length, quedan: quedan.length,
-      mismos: quedan.length > 0 && quedan.every((tr) => antes.get(tr.dataset.id) === tr),
-      afuera: saliendo.every((tr) => getComputedStyle(tr).position === 'absolute'),
-      celdas: saliendo.every((tr) => celdas(tr).every((w, i) => Math.abs(w - anchosAntes.get(tr.dataset.id)[i]) <= 1)),
-    };
-    await new Promise((ok) => setTimeout(ok, 500));
-    r.alFinal = tbody.querySelectorAll(':scope > [data-state="closing"]').length;
-    document.querySelector('#mv-filter [data-value="all"]').click();
-    await new Promise((ok) => setTimeout(ok, 500));
-    return r;
-  })()`);
-  ok('filtrar: las filas que siguen son las mismas (no vuelven a entrar)', filtro.mismos, JSON.stringify(filtro));
-  ok('y las que se van se esfuman fuera del flujo, con el ancho de sus celdas',
-    filtro.saliendo > 0 && filtro.afuera && filtro.celdas && filtro.alFinal === 0, JSON.stringify(filtro));
-
-  /* Editar: el formulario y la tabla son los MISMOS nodos; la fila se marca en
-     el lugar y el banner se despliega con su transición (antes nacía abierto). */
-  const edicion = await js(`(async () => {
-    const qa = document.getElementById('qa');
-    const fila = document.querySelector('#mv-rows .ox-tr');
-    const banner = document.getElementById('qa-banner');
-    fila.querySelector('[data-edit]').click();
-    await new Promise((r) => setTimeout(r, 60));
-    const r = { mismoForm: document.getElementById('qa') === qa,
-      mismaFila: document.querySelector('#mv-rows .ox-tr') === fila,
-      marcada: fila.classList.contains('is-editing'),
-      despliega: banner.getAnimations().some((a) => a.transitionProperty === 'grid-template-rows'),
-      dice: document.querySelector('.ox-inspector__head .ox-label').textContent };
-    document.getElementById('qa-cancel').click();
-    await new Promise((r) => setTimeout(r, 450));
-    r.desmarcada = !fila.classList.contains('is-editing');
-    r.cerrado = !banner.classList.contains('is-open');
-    return r;
-  })()`);
-  ok('editar no rehace el formulario ni la tabla', edicion.mismoForm && edicion.mismaFila && edicion.marcada, JSON.stringify(edicion));
-  ok('el banner de edición se despliega con su transición', edicion.despliega, JSON.stringify(edicion));
-  ok('y cancelar lo deja todo como estaba', edicion.desmarcada && edicion.cerrado, JSON.stringify(edicion));
-
-  /* El tipo: la cápsula existe (antes, sin bindSwitcher, quedaba en ancho 0) y
-     cambiar de tipo no rehace el formulario. */
-  const tipo = await js(`(async () => {
-    const qa = document.getElementById('qa');
-    const seg = document.getElementById('qa-type');
-    const ancho = () => parseFloat(getComputedStyle(seg, '::before').width);
-    const antes = ancho();
-    // Siempre la otra opción: la edición de arriba pudo dejar cualquiera de las dos.
-    const otra = seg.querySelector('.ox-segmented__opt:not(.is-active)');
-    const volver = seg.querySelector('.ox-segmented__opt.is-active');
-    otra.click();
-    await new Promise((r) => setTimeout(r, 450));
-    const r = { mismoForm: document.getElementById('qa') === qa, antes, despues: ancho(),
-      cambio: document.querySelector('#qa-type .ox-segmented__opt.is-active')?.dataset.value === otra.dataset.value,
-      cats: document.querySelectorAll('#qa-cats > .fw-cat-btn').length };
-    document.querySelector('#qa-type [data-value="' + volver.dataset.value + '"]').click();
-    await new Promise((r) => setTimeout(r, 450));
-    return r;
-  })()`);
-  ok('el segmentado del tipo tiene su cápsula', tipo.antes > 0 && tipo.despues > 0, JSON.stringify(tipo));
-  ok('y cambiar de tipo no rehace el formulario', tipo.cambio && tipo.mismoForm && tipo.cats > 0, JSON.stringify(tipo));
-
-  /* El calendario: cambiar de mes funde los días en su lugar, y el calco
-     conserva las 7 columnas (el de swap() no heredaba las de una grilla). */
-  const calendario = await js(`(async () => {
-    document.getElementById('qa-dp-field').click();
-    await new Promise((r) => setTimeout(r, 400));
-    const grid = document.querySelector('.fw-dp__grid');
-    document.querySelector('.fw-dp__pop [data-shift="1"]').click();
-    const calco = grid.querySelector(':scope > .ox-swap-out--fundido');
-    const columnas = calco ? getComputedStyle(calco).gridTemplateColumns.split(' ').length : 0;
-    await new Promise((r) => setTimeout(r, 400));
-    const r = { calco: !!calco, columnas, mismaGrilla: document.querySelector('.fw-dp__grid') === grid,
-      dias: grid.querySelectorAll(':scope > .fw-dp__day').length };
-    document.getElementById('qa-dp-field').click();
-    await new Promise((r) => setTimeout(r, 400));
-    return r;
-  })()`);
-  ok('cambiar de mes en el calendario funde los días en su lugar',
-    calendario.calco && calendario.mismaGrilla && calendario.dias === 42, JSON.stringify(calendario));
-  ok('y el calco conserva las 7 columnas de la grilla', calendario.columnas === 7, JSON.stringify(calendario));
-
-  /* Borrar una fila: se esfuma y las de abajo suben deslizándose. Antes se
-     rehacía la tabla entera (todas re-entraban) y lo de abajo saltaba. */
-  const borrado = await js(`(async () => {
-    const tbody = document.getElementById('mv-rows');
-    const filas = [...tbody.querySelectorAll(':scope > .ox-tr')];
-    if (filas.length < 2) return { saltea: filas.length };
-    const fila = filas[0];
-    fila.querySelector('[data-del]').click();
-    for (let i = 0; i < 50 && !document.querySelector('.ox-modal .ox-btn--danger-solid'); i++) await new Promise((r) => setTimeout(r, 20));
-    document.querySelector('.ox-modal .ox-btn--danger-solid').click();
-    let aMitad = null;
-    const t0 = performance.now();
-    while (fila.isConnected && performance.now() - t0 < 2000) {
-      const op = +getComputedStyle(fila).opacity;
-      if (op > 0.05 && op < 0.95) aMitad = op;
-      await new Promise((r) => requestAnimationFrame(r));
-    }
-    const desliza = filas.slice(1).some((f) => f.getAnimations().length > 0);
-    await new Promise((r) => setTimeout(r, 400));
-    return { aMitad, desliza, mismoTbody: document.getElementById('mv-rows') === tbody,
-      antes: filas.length, quedan: tbody.querySelectorAll(':scope > .ox-tr').length };
-  })()`);
-  if (borrado.saltea != null) console.log(`  --   borrado salteado (filas=${borrado.saltea})`);
-  else {
-    ok('borrar una fila la esfuma, sin rehacer la tabla',
-      borrado.aMitad != null && borrado.mismoTbody && borrado.quedan === borrado.antes - 1, JSON.stringify(borrado));
-    ok('y las de abajo suben deslizándose', borrado.desliza, JSON.stringify(borrado));
-  }
+  console.log('\n10. F5 Calculadora');
+  await tecla('F5');
+  await sleep(800);
+  await escribir('.fw-hoja [data-campo="concepto"]', 'pan');
+  await escribir('.fw-hoja [data-campo="monto"]', '1.500');
+  await sleep(800);
+  ok('el total suma al tipear', /1\.500/.test(await js(`document.querySelector('[data-tot]').textContent`)));
+  await js(`(() => { const ms = document.querySelectorAll('.fw-hoja [data-campo="monto"]'); const m = ms[1]; m.focus(); m.value = '12.5oo'; m.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   await sleep(500);
+  ok('un monto mal escrito queda marcado y no suma', /1 NO SUMA/.test(await js(`document.querySelector('[data-bad]').textContent`)));
+  await js(`document.activeElement.blur()`);
+  await tecla('n');
+  await sleep(700);
+  ok('N abre otra hoja', (await js(`document.querySelectorAll('.fw-hoja').length`)) === 2);
+  await js(`document.activeElement.blur()`);
+  await sleep(700);
 
-  console.log('\n12. La consola quedó limpia');
+  console.log('\n11. F6 Ajustes');
+  await tecla('F6');
+  await sleep(800);
+  await click('#aj-crt [data-v="fuerte"]');
+  await sleep(500);
+  ok('el CRT se cambia al toque', (await js(`document.documentElement.dataset.crt`)) === 'fuerte');
+  ok('y se guarda (pantalla.json)', leerDoc('pantalla')?.crt === 'fuerte');
+  await click('#aj-cinta [data-v="quieta"]');
+  await sleep(300);
+  ok('la cinta se puede dejar quieta', (await js(`getComputedStyle(document.getElementById('tape')).animationPlayState`)) === 'paused');
+  await click('#aj-crt [data-v="suave"]');
+  await click('#aj-cinta [data-v="mueve"]');
+  await sleep(300);
+  await tecla('i');
+  await sleep(1300);
+  ok('I importa un respaldo de FinWatch y muestra el resumen', /importados/i.test(await js(`document.querySelector('.ox-modal__title')?.textContent || ''`)));
+  ok('con la fila rota descartada', /DESCARTADOS/.test(await js(`document.querySelector('.ox-modal__body')?.textContent || ''`)));
+  await js(`document.querySelector('.ox-modal__foot .ox-btn')?.click()`);
+  await sleep(900);
+  ok('y los movimientos nuevos están en el disco', movs().some((m) => m.id === 'mudanza-1'));
+
+  console.log('\n12. Nada nativo de Chromium, nada de glifos, consola limpia');
+  ok('ningún title= nativo', (await js(`document.querySelectorAll('[title]').length`)) === 0);
+  /* Todo símbolo es un SVG propio. Se permiten los tipográficos que SÍ son
+     texto: el menos real (−), el separador (·) y las comillas. Se barre cada
+     pantalla. */
+  const glifos = [];
+  for (let i = 1; i <= 6; i++) {
+    await tecla(`F${i}`);
+    await sleep(600);
+    glifos.push(...await js(`(() => {
+      const malos = /[\\u2190-\\u21FF\\u2700-\\u27BF\\u2B00-\\u2BFF\\uFE0F\\u2600-\\u26FF\\u25A0-\\u25FF]|[\\uD83C-\\uDBFF][\\uDC00-\\uDFFF]/;
+      const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const out = [];
+      while (w.nextNode()) { const t = w.currentNode.nodeValue; if (malos.test(t)) out.push(t.trim().slice(0, 40)); }
+      return out;
+    })()`));
+  }
+  ok('cero emojis y cero flechas o triángulos unicode, en las seis pantallas', glifos.length === 0, [...new Set(glifos)].join(' | '));
   ok('sin errores ni warnings del renderer', errores.length === 0, errores.slice(0, 6).join(' | '));
 
-  /* Electron todavía tiene tomado el userData (Cache, Local Storage, el
-     lockfile de la sesión), así que borrarlo acá da EPERM en Windows. No es
-     una falla del test: el directorio es temporal y lo limpia el sistema. */
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* lo tiene Electron */ }
   console.log(`\n═══ ${pass} ok · ${fail} fallas ═══`);
   app.exit(fail ? 1 : 0);

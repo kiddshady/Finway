@@ -114,7 +114,9 @@ export function go(name, param = null) {
     // `both` deja su último cuadro aplicado para siempre, y una opacidad
     // retenida vuelve a la vista frontera de backdrop para lo que tenga adentro.
     const settle = (ev) => {
-      if (ev.target !== host || ev.animationName !== 'ox-glide-in') return;
+      // La entrada es la que declare .ox-view en motion.css (glide en Onyx, rise
+      // en Finway): se escucha cualquiera de las dos.
+      if (ev.target !== host || !/^ox-(glide|rise)-in$/.test(ev.animationName)) return;
       host.removeEventListener('animationend', settle);
       host.classList.add('is-settled');
     };

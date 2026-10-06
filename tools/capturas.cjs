@@ -12,32 +12,33 @@ app.setPath('userData', path.join(tmp, 'userData'));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 app.whenReady().then(async () => {
   require(path.join(ROOT, 'src', 'ipc.cjs')).register();
-  const win = new BrowserWindow({ width: 1280, height: 820, center: true, frame: false, show: true, backgroundColor: '#0a0a0a',
+  const win = new BrowserWindow({ width: 1280, height: 820, center: true, frame: false, show: true, backgroundColor: '#070605',
     webPreferences: { preload: path.join(ROOT, 'preload.cjs'), contextIsolation: true, sandbox: true } });
   win.webContents.on('console-message', (e) => console.log('CONSOLE', e.level, e.message));
   await win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
   await sleep(4000); await win.webContents.capturePage(); await sleep(400);
   const out = path.join(ROOT, '.shots'); fs.mkdirSync(out, { recursive: true });
+  const js = (code) => win.webContents.executeJavaScript(code);
+  const shot = async (name) => fs.writeFileSync(path.join(out, `${pref}-${name}.png`), (await win.webContents.capturePage()).toPNG());
+  const tecla = (key) => js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true }))`);
+  // --mes=N: N meses para atrás (con la flecha, como se usa la app), para ver
+  // gráficos y tablas con datos: el mes en curso puede estar vacío.
+  for (let i = 0; i < mes; i++) { await tecla('ArrowLeft'); await sleep(700); }
   for (const v of ['resumen', 'movimientos', 'presupuestos', 'metas', 'calculadora', 'ajustes']) {
-    await win.webContents.executeJavaScript(`document.querySelector('[data-view="${v}"]').click()`);
-    await sleep(1400);
-    // --mes=-1: un mes para atrás, para ver gráficos y tabla con datos.
-    if (mes && ['resumen', 'movimientos'].includes(v)) {
-      for (let i = 0; i < mes; i++) { await win.webContents.executeJavaScript(`document.querySelector('[data-month="-1"]')?.click()`); await sleep(900); }
-    }
-    fs.writeFileSync(path.join(out, `${pref}-${v}.png`), (await win.webContents.capturePage()).toPNG());
+    await js(`document.querySelector('.fw-fk__b[data-view="${v}"]').click()`);
+    await sleep(1600);
+    await shot(v);
   }
-  // --overlays: el menú de categorías, el calendario y el modal de Nuevo movimiento,
-  // sobre Movimientos (con datos detrás, para ver que el vidrio esmerila).
+  // --overlays: el menú de categorías, el menú contextual de una fila y el
+  // formulario de un movimiento con su calendario abierto.
   if (process.argv.includes('--overlays')) {
-    const shot = async (name) => fs.writeFileSync(path.join(out, `${pref}-${name}.png`), (await win.webContents.capturePage()).toPNG());
-    const js = (code) => win.webContents.executeJavaScript(code);
-    await js(`document.querySelector('[data-view="movimientos"]').click()`); await sleep(3000);
-    await js(`document.querySelector('#mv-cat').click()`); await sleep(700); await shot('menu');
-    await js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); await sleep(500);
+    await js(`document.querySelector('.fw-fk__b[data-view="movimientos"]').click()`); await sleep(1600);
+    await js(`document.querySelector('#mov-cat').click()`); await sleep(700); await shot('menu');
+    await tecla('Escape'); await sleep(500);
+    await js(`document.querySelectorAll('.fw-ledger__r')[3]?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 520, clientY: 260 }))`); await sleep(800); await shot('contextual');
+    await tecla('Escape'); await sleep(500);
+    await js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, bubbles: true }))`); await sleep(900); await shot('formulario');
     await js(`document.querySelector('#qa-dp-field').click()`); await sleep(700); await shot('calendario');
-    await js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); await sleep(500);
-    await js(`document.querySelector('.fw-tr, .ox-table tbody tr')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 600, clientY: 300 }))`); await sleep(900); await shot('contextual');
   }
   app.exit(0);
 });

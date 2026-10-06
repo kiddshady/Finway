@@ -1,221 +1,138 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   OPAL — tokens
+   FINWAY · TERMINAL — tokens
    La única fuente de verdad del sistema. Ningún componente escribe un valor
-   crudo: todo sale de acá. Cambiar el carácter de una app = cambiar este archivo.
+   crudo: todo sale de acá.
 
-   Opal es el hermano de vidrio de Onyx: donde Onyx apila superficies OPACAS
-   que suben de luminancia, Opal apila HOJAS TRANSLÚCIDAS sobre un sustrato de
-   niebla. La profundidad no la da el tinte: la da la luz que atraviesa.
-   Por eso el default es acromático ABSOLUTO (tint 0) y no se ve muerto: la
-   variación que en Onyx pone la croma, acá la pone la niebla del fondo.
+   Una terminal financiera oscura: negro cálido y OPACO (nada de vidrio), un
+   solo acento ámbar de fósforo que marca lo activo y lo que se puede tocar, y
+   el par verde/rojo reservado para lo que entra y lo que sale. La profundidad
+   la dan los paneles —un escalón de luz arriba del fondo, un hairline y una
+   sombra larga—, no las transparencias.
 
-   FINWAY: piel de Opal sobre el motor de Onyx (octubre de 2026). Los tokens y
-   el CSS visual salen de Opal; la mecánica atada al JS (motion.js, overlays,
-   router) sigue siendo la de Onyx, que es la más nueva. Por eso el prefijo
-   sigue siendo `ox-`: renombrarlo no le cambiaba nada a quien mira la app.
+   Los nombres siguen siendo `--ox-*` porque el motor los lee: los modales,
+   los menús, colorToken() y la sincronización del color de la ventana
+   (app.js) son los de Onyx. Lo que cambió es lo que valen.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ══════════════════════════════════════════════════════════════════════════
-     LAS PERILLAS
-     Lo único que cambia entre una app y otra. El resto de este archivo se
-     deriva de acá y no hace falta tocarlo.
+  /* ══ LAS PERILLAS ══════════════════════════════════════════════════════════
+     El matiz y la temperatura del negro. Con estos dos se deriva toda la
+     escalera de superficies y de texto: cálida (hue ~70) para que el ámbar no
+     se vea pegado sobre un negro azulado. */
+  --ox-hue: 72;
+  --ox-tint: 1;
 
-     No las edites a mano: `node tools/retint.mjs --blur 24 --fog 1.4`.
-     El color base está duplicado en hex en main.cjs y en el splash del
-     index.html (Electron no entiende oklch), y desincronizarlos trae de vuelta
-     el destello blanco al restaurar la ventana. El script toca los tres.
-     ══════════════════════════════════════════════════════════════════════════ */
+  /* El acento como triplete RGB: el ámbar de un monitor de fósforo P3. Se
+     declara así para derivar los washes con alfa sin repetir el color. */
+  --ox-accent-rgb: 248 172 61;
 
-  /* El matiz LATENTE de la escalera de grises, en grados OKLCH. Con la
-     temperatura en 0 no actúa: queda esperando a que alguna app lo despierte.
-       258 = azul frío   ·  30 = cálido   ·  145 = verde   ·  285 = violeta */
-  --ox-hue: 258;
+  /* Una sola familia, y también para la "mono": en una terminal todo es mono. */
+  --ox-mono: var(--ox-mono-vt);
+  --ox-mono-vt: 'VT323', 'Cascadia Mono', Consolas, monospace;
 
-  /* Cuánta temperatura. El default de Opal es 0: gris absoluto, neutro de
-     verdad. En Onyx el gris puro se lee muerto; acá no, porque la variación
-     de luminancia la pone la niebla. Subilo solo si la app pide carácter. */
-  --ox-tint: 0;
+  /* ══ DERIVADO ══════════════════════════════════════════════════════════════ */
 
-  /* El acento, como triplete RGB (sin coma: es la sintaxis moderna de rgb()).
-     Se declara así para poder derivar los washes con alfa sin repetir el color.
-     El default es luz — pero en Opal el acento NUNCA rellena un plano: vive en
-     cantos, líneas y puntos (ver "la luz no rellena, talla", más abajo).
-       cian    : 34 211 238    ·  violeta : 167 139 250
-       verde   : 74 222 128    ·  ámbar   : 251 191 36 */
-  --ox-accent-rgb: 240 243 247;
+  /* ── Superficies: todas opacas ─────────────────────────────────────────── */
+  --ox-bg:      oklch(12.4% calc(.0042 * var(--ox-tint)) var(--ox-hue));   /* la ventana */
+  --ox-sunken:  oklch(9.6%  calc(.0030 * var(--ox-tint)) var(--ox-hue));   /* pozos: campos, cinta, línea de carga */
+  --ox-sunken-2: oklch(8%   calc(.0024 * var(--ox-tint)) var(--ox-hue));   /* el pozo con foco */
+  --ox-s1:      oklch(15.6% calc(.0052 * var(--ox-tint)) var(--ox-hue));   /* panel */
+  --ox-s2:      oklch(18.4% calc(.0064 * var(--ox-tint)) var(--ox-hue));   /* cabecera de panel, fila elevada */
+  --ox-s3:      oklch(21%   calc(.0076 * var(--ox-tint)) var(--ox-hue));   /* menú, modal, popover */
+  --ox-s4:      oklch(24%   calc(.0088 * var(--ox-tint)) var(--ox-hue));   /* tooltip, lo más alto */
 
-  /* La familia monoespaciada: la de los datos exactos, el código y los IDs.
-     Apunta a uno de los tokens `--ox-mono-*` de abajo, nunca directo a un
-     nombre de familia — la indirección es lo que deja cambiarla desde el
-     script en vez de a mano. */
-  --ox-mono: var(--ox-mono-roboto);
+  /* Lo que el motor de Onyx/Opal todavía nombra y acá no existe: sin vidrio
+     y sin niebla. Quedan definidos (y apagados) para que ninguna regla vieja
+     caiga en un valor inválido. */
+  --ox-glass: none;
+  --ox-glass-heavy: none;
+  --ox-blur: 0px;
+  --ox-fog: 0;
+  --ox-sustrato: none;
+  --ox-deep:   var(--ox-sunken);
+  --ox-deep-2: var(--ox-sunken-2);
 
-  /* Las familias disponibles. Las empaquetadas se declaran en fonts.css; la
-     opción `sistema` no empaqueta nada y usa lo que haya instalado, que es
-     rápido pero se ve distinto en cada máquina. */
-  --ox-mono-roboto:  'Roboto Mono', ui-monospace, monospace;
-  --ox-mono-sistema: 'Cascadia Mono', Consolas, 'SF Mono', ui-monospace, monospace;
-
-  /* Cuánto desenfoca el vidrio. Es EL carácter de Opal: bajalo y el vidrio se
-     vuelve casi transparente, subilo y se vuelve esmerilado profundo.
-     Rango útil: 10–28. */
-  --ox-blur: 17px;
-
-  /* Cuánta niebla hay detrás del vidrio. Multiplica el alfa de las manchas de
-     luz del sustrato. 0 = fondo plano (no recomendado: el blur se queda sin
-     nada que repartir) · 1 = el default · 2 = notablemente luminoso. */
-  --ox-fog: 1;
-
-  /* ══════════════════════════════════════════════════════════════════════════
-     DERIVADO — de acá para abajo casi nunca hace falta tocar nada.
-     ══════════════════════════════════════════════════════════════════════════ */
-
-  /* ── El fondo y las hojas ──────────────────────────────────────────────────
-     Una sola superficie OPACA en todo el sistema: --ox-bg, el fondo de la
-     ventana. Encima va la niebla (shell.css → .ox-fog) y encima de la niebla,
-     HOJAS de vidrio: rellenos de pura luz con alfa, que dejan pasar el fondo.
-
-     La escalera s1–s4 conserva los nombres de Onyx (rail → panel → flotante →
-     lo más alto) pero acá son alfas de blanco, no colores opacos: cuanto más alto
-     flota algo, más luz junta. */
-  --ox-bg: oklch(14.5% calc(.0046 * var(--ox-tint)) var(--ox-hue));
-
-  --ox-s1: rgb(255 255 255 / .035);   /* rail, titlebar, statusbar */
-  --ox-s2: rgb(255 255 255 / .055);   /* card, panel, fila elevada */
-  --ox-s3: rgb(255 255 255 / .085);   /* menú, modal, popover, tooltip */
-  --ox-s4: rgb(255 255 255 / .11);    /* lo más alto: lo que flota sobre todo */
-
-  /* Hundido: campos, consola, lienzo. En Opal es un pozo de sombra —alfa de
-     negro— para que hunda sobre cualquier hoja, no solo sobre el fondo. */
-  --ox-sunken:   rgb(0 0 0 / .28);
-  --ox-sunken-2: rgb(0 0 0 / .44);    /* el mismo pozo, con foco o abierto */
-
-  /* El backgroundColor de la BrowserWindow tiene que coincidir con --ox-bg.
-     Electron no entiende oklch, así que main.cjs lleva el hex equivalente y el
-     renderer se lo vuelve a mandar ya calculado al arrancar (ver app.js →
-     syncWindowColor). Si cambiás el matiz, no hace falta tocar main.cjs. */
-
-  /* ── El vidrio ─────────────────────────────────────────────────────────────
-     backdrop-filter listo para usar. `saturate` va alto a propósito: en clave
-     acromática lo poco que atraviesa es luz casi sin color, y sin saturar el
-     resultado se lava a gris parejo. Con contenido de color debajo (una
-     imagen, un chart), esa saturación es lo que lo hace brillar a través.
-
-     LA REGLA DE LAS HOJAS: el blur va SOLO en el shell y en los overlays —
-     hermanos directos sobre la niebla o sobre el contenido. Lo que vive
-     ADENTRO de una hoja (cards, chips, filas) es relleno translúcido sin
-     backdrop-filter: desenfocar lo ya desenfocado cuesta GPU y no se ve. */
-  --ox-glass:       blur(var(--ox-blur)) saturate(135%);
-  --ox-glass-heavy: blur(calc(var(--ox-blur) * 1.65)) saturate(135%);
-
-  /* ── Filos ─────────────────────────────────────────────────────────────────
-     El canto de una hoja de vidrio junta luz arriba: ese hairline superior
-     iluminado es lo que la hace leerse como vidrio y no como un gris más.
-     Siempre como box-shadow inset: un border real deja hilacha en las
-     esquinas redondeadas con overflow:hidden. */
-  --ox-edge-lit: rgb(255 255 255 / .10);
-  --ox-line:   rgb(255 255 255 / .055);
-  --ox-line-2: rgb(255 255 255 / .09);
-  --ox-line-3: rgb(255 255 255 / .15);
-
-  /* El contorno de hoja completo: canto iluminado + hairline perimetral.
-     Se combina con cualquier elevación: box-shadow: var(--ox-sheet), var(--ox-e3) */
-  --ox-sheet: inset 0 1px 0 var(--ox-edge-lit), inset 0 0 0 1px var(--ox-line);
+  /* ── Filos: hairlines de luz cálida ───────────────────────────────────── */
+  --ox-line:   rgb(255 232 196 / .07);
+  --ox-line-2: rgb(255 232 196 / .12);
+  --ox-line-3: rgb(255 232 196 / .2);
+  --ox-edge-lit: rgb(255 232 196 / .05);
   --ox-hairline: inset 0 0 0 1px var(--ox-line);
+  --ox-sheet: inset 0 0 0 1px var(--ox-line);
 
-  /* ── Texto: escalera de énfasis ────────────────────────────────────────── */
-  --ox-text:   oklch(93.9% calc(.0046 * var(--ox-tint)) var(--ox-hue));  /* primario — nunca blanco puro */
-  --ox-text-2: oklch(73.3% calc(.0116 * var(--ox-tint)) var(--ox-hue));  /* secundario */
-  /* text-3 es el gris más bajo que todavía se LEE: pasa 4,5:1 (WCAG, texto
-     chico) sobre el fondo y sobre las tres hojas. Con 55,4 % daba 3,8 sobre
-     una s2, y las ayudas de 11 px de un formulario no llegaban. text-4 no se
-     lee: es solo para lo deshabilitado, los placeholders y los íconos de
-     adorno, nunca para un dato (una hora, una clave, un atajo, un estado vacío). */
-  --ox-text-3: oklch(63% calc(.0138 * var(--ox-tint)) var(--ox-hue));    /* muted: metadatos, labels, atajos */
-  --ox-text-4: oklch(42.3% calc(.0142 * var(--ox-tint)) var(--ox-hue));  /* faint: deshabilitado, placeholder */
+  /* ── Texto: papel cálido sobre negro ───────────────────────────────────
+     text-3 es el gris más bajo que todavía se LEE (pasa 4,5:1 sobre el panel);
+     text-4 es para lo apagado, los placeholders y los adornos, nunca un dato. */
+  --ox-text:   oklch(92% calc(.022 * var(--ox-tint)) 85);
+  --ox-text-2: oklch(75% calc(.024 * var(--ox-tint)) 80);
+  --ox-text-3: oklch(63% calc(.022 * var(--ox-tint)) 78);
+  --ox-text-4: oklch(46% calc(.016 * var(--ox-tint)) 75);
 
-  /* ── Acento ────────────────────────────────────────────────────────────────
-     Todo deriva del triplete de arriba: cambiarlo re-tinta hovers, focus,
-     selección y estados activos de una. */
+  /* ── El acento ──────────────────────────────────────────────────────────
+     Marca lo activo, lo elegido y lo que se puede tocar. Nunca decora. */
   --ox-accent:     rgb(var(--ox-accent-rgb));
-  --ox-accent-ink: var(--ox-bg);              /* tinta SOBRE el acento */
-  --ox-wash-1:     rgb(var(--ox-accent-rgb) / .05);   /* hover sutil */
-  --ox-wash-2:     rgb(var(--ox-accent-rgb) / .09);   /* hover fuerte / seleccionado */
-  --ox-wash-3:     rgb(var(--ox-accent-rgb) / .15);   /* activo / presionado */
-  --ox-ring:       rgb(var(--ox-accent-rgb) / .55);   /* focus del teclado */
-  --ox-select:     rgb(var(--ox-accent-rgb) / .16);   /* ::selection */
-  /* La selección sobre una superficie CLARA dentro de la app (una hoja de
-     PDF, una vista previa): el mismo gesto invertido. Sobre el fondo oscuro
-     seleccionar aclara (el acento tendido, que en la paleta luz es blanco);
-     sobre papel blanco eso no se ve —deja el papel en 253 de 255, 1,02:1—,
-     así que oscurece: el fondo de la app al mismo 16 %. Con color-mix y no
-     con los números de --ox-bg, así sigue a la paleta. Lo usa .ox-sobre-claro
-     (base.css). Nació en el lector de Quire. */
+  --ox-accent-ink: oklch(14% .03 70);                     /* tinta SOBRE el ámbar */
+  --ox-accent-dim: rgb(var(--ox-accent-rgb) / .55);
+  --ox-wash-1:     rgb(var(--ox-accent-rgb) / .06);
+  --ox-wash-2:     rgb(var(--ox-accent-rgb) / .1);
+  --ox-wash-3:     rgb(var(--ox-accent-rgb) / .16);
+  --ox-accent-line: rgb(var(--ox-accent-rgb) / .24);
+  --ox-ring:       rgb(var(--ox-accent-rgb) / .8);
+  --ox-select:     rgb(var(--ox-accent-rgb) / .5);
   --ox-select-claro: color-mix(in oklab, var(--ox-bg) 16%, transparent);
+  --ox-rim:   var(--ox-accent-line);
+  --ox-rim-2: var(--ox-accent-dim);
 
-  /* Con un acento oscuro o muy saturado, la tinta encima tiene que ser clara.
-     Descomentá esto si tu acento no es luz:
-       --ox-accent-ink: oklch(97% .01 var(--ox-hue)); */
+  /* ── Entra / sale ───────────────────────────────────────────────────────
+     El único par de colores que la app pide entender. Las variaciones lo
+     usan al revés según lo que se mire: gastar más es rojo, ganar más es
+     verde. Las categorías nunca se le acercan (categories.js). */
+  --fw-in:  oklch(78% .14 152);
+  --fw-out: oklch(70% .16 27);
+  --fw-in-text:  var(--fw-in);
+  --fw-out-text: var(--fw-out);
 
-  /* ── El énfasis: la luz no rellena, talla ──────────────────────────────────
-     La ley que separa a Opal de Onyx. En Onyx lo primario se PINTA de acento —
-     un plano de luz. En Opal lo primario se TALLA: es el objeto más profundo
-     de la pantalla, con el canto más vivo. El acento vive en cantos, líneas y
-     puntos — nunca inunda una superficie. Por eso con un acento de color el
-     primario no se vuelve un botón de color: se vuelve obsidiana con el canto
-     encendido. */
-  --ox-deep:   rgb(0 0 0 / .38);                  /* el pozo del énfasis */
-  --ox-deep-2: rgb(0 0 0 / .50);                  /* más hondo: hover */
-  --ox-rim:    rgb(var(--ox-accent-rgb) / .40);   /* el canto vivo */
-  --ox-rim-2:  rgb(var(--ox-accent-rgb) / .62);   /* el canto, encendido */
-
-  /* ── Rojo: reservado para el fallo ─────────────────────────────────────────
-     No es "un color más de la paleta": es el único que dice que algo se rompió.
-     Si aparece decorando, deja de significar. */
-  --ox-danger-rgb: 212 103 107;
-  --ox-danger:      rgb(var(--ox-danger-rgb));
-  --ox-danger-dim:  oklch(47.5% .106 18);
-  --ox-danger-hover: color-mix(in srgb, var(--ox-danger-dim), var(--ox-danger) 25%);   /* el sólido bajo el mouse */
-  --ox-danger-wash: rgb(var(--ox-danger-rgb) / .12);
+  /* El rojo del sistema (borrar, errores) es el mismo de lo que sale. */
+  --ox-danger-rgb: 242 113 102;
+  --ox-danger:      var(--fw-out);
+  --ox-danger-dim:  oklch(52% .15 27);
+  --ox-danger-hover: oklch(58% .16 27);
+  --ox-danger-wash: rgb(var(--ox-danger-rgb) / .1);
   --ox-danger-ring: rgb(var(--ox-danger-rgb) / .45);
 
-  /* ── Lo que hunde ──────────────────────────────────────────────────────────
-     El velo detrás de un modal y el pie del modal, que se hunde apenas. Antes
-     vivían escritos a mano en overlays.css. */
-  --ox-scrim: rgb(3 3 4 / .48);
-  --ox-foot:  rgb(0 0 0 / .16);
+  /* ── Lo que hunde ──────────────────────────────────────────────────────── */
+  --ox-scrim: rgb(4 3 2 / .66);
+  --ox-foot:  var(--ox-s2);
 
-  /* ── Tipografía ────────────────────────────────────────────────────────────
-     Sans para toda la interfaz, mono SOLO para dato exacto: IDs, números,
-     rutas, timestamps. El mono en texto corrido se lee técnico de más. */
-  --ox-font: 'Inter', 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI',
-             system-ui, -apple-system, sans-serif;
-  /* --ox-mono vive arriba, entre las perillas: es lo que más se cambia por app.
-     La sans todavía sale del sistema — si querés fijarla, empaquetala en
-     fonts.css igual que la mono y sumale su token acá. */
+  /* ── Tipografía ─────────────────────────────────────────────────────────
+     VT323 tiene la x baja (40 % del cuerpo): sin ajuste, a 13 px se lee como
+     si fuera de 10. `font-size-adjust` la escala a la altura de x de una letra
+     normal, así los tamaños de abajo significan lo que dicen. Lo aplica
+     base.css sobre la raíz y lo heredan también los campos. */
+  --ox-font: var(--ox-mono-vt);
+  --ox-x-height: .5;
 
-  --ox-fs-10:  10px;   /* eyebrow / versalitas */
-  --ox-fs-11:  11px;   /* metadatos, statusbar */
-  --ox-fs-12:  12px;   /* labels, secundario */
-  --ox-fs-13:  13px;   /* base de la UI */
-  --ox-fs-15:  15px;   /* título de panel */
-  --ox-fs-19:  19px;   /* título de vista */
-  --ox-fs-26:  26px;   /* display */
+  --ox-fs-10:  10.5px;  /* versalitas de cabecera */
+  --ox-fs-11:  11px;    /* metadatos */
+  --ox-fs-12:  12px;    /* labels, tablas */
+  --ox-fs-13:  13px;    /* base de la UI */
+  --ox-fs-15:  15px;    /* título de modal */
+  --ox-fs-19:  19px;
+  --ox-fs-26:  26px;    /* cifra de un stat */
+  --ox-fs-40:  40px;    /* la cifra del balance */
 
-  --ox-lh-tight: 1.25;
-  --ox-lh:       1.5;
-  --ox-lh-loose: 1.65;
+  --ox-lh-tight: 1.2;
+  --ox-lh:       1.4;
+  --ox-lh-loose: 1.55;
 
+  /* Un solo peso real: todo es 400 (ver fonts.css). */
   --ox-w-regular: 400;
-  --ox-w-medium:  500;
-  --ox-w-semi:    600;
+  --ox-w-medium:  400;
+  --ox-w-semi:    400;
 
-  /* Tracking: negativo en lo grande, generoso en las versalitas.
-     Es el detalle silencioso que separa "editorial" de "bootstrap". */
-  --ox-track-tight:  -.014em;
-  --ox-track-normal:  0;
-  --ox-track-caps:    .13em;
+  --ox-track-tight:  0;
+  --ox-track-normal: .02em;
+  --ox-track-caps:   .12em;
 
   /* ── Espaciado (escala de 4) ───────────────────────────────────────────── */
   --ox-1:   4px;
@@ -229,43 +146,31 @@
   --ox-9:  56px;
   --ox-10: 72px;
 
-  /* ── Radios: apenas redondeado. Las hojas que flotan suben medio punto. ── */
-  --ox-r-xs:   4px;
-  --ox-r-sm:   6px;
-  --ox-r-md:   8px;
-  --ox-r-lg:  12px;
-  --ox-r-xl:  16px;
+  /* ── Radios: casi rectos, como una consola ─────────────────────────────── */
+  --ox-r-xs:   3px;
+  --ox-r-sm:   4px;
+  --ox-r-md:   5px;
+  --ox-r-lg:   6px;
+  --ox-r-xl:   7px;
   --ox-r-pill: 999px;
 
-  /* ── Elevación ─────────────────────────────────────────────────────────────
-     Sombras largas y suaves: la profundidad la da la elevación, nunca un
-     contorno duro. Una hoja de vidrio flota lejos de lo que tapa. */
-  --ox-e1: 0 1px 2px rgb(0 0 0 / .30);
-  --ox-e2: 0 2px 8px rgb(0 0 0 / .34), 0 12px 34px rgb(0 0 0 / .40);
-  --ox-e3: 0 4px 12px rgb(0 0 0 / .38), 0 20px 48px rgb(0 0 0 / .46);
-  --ox-e4: 0 8px 24px rgb(0 0 0 / .44), 0 32px 80px rgb(0 0 0 / .58);
+  /* ── Elevación ─────────────────────────────────────────────────────────── */
+  --ox-e1: 0 1px 2px rgb(0 0 0 / .5);
+  --ox-e2: 0 10px 30px -12px rgb(0 0 0 / .8);
+  --ox-e3: 0 14px 36px -12px rgb(0 0 0 / .85);
+  --ox-e4: 0 20px 56px -14px rgb(0 0 0 / .9);
 
-  /* ── Movimiento ────────────────────────────────────────────────────────────
-     Opal se mueve con seguridad: sale rápido, frena largo. Nada rebota. */
-  --ox-ease:      cubic-bezier(.16, 1, .3, 1);     /* expo-out: el default */
-  --ox-ease-soft: cubic-bezier(.33, 1, .68, 1);    /* cubic-out: micro-hovers */
-  --ox-ease-both: cubic-bezier(.65, 0, .35, 1);    /* in-out: lo que va y vuelve */
-  --ox-ease-in:   cubic-bezier(.55, 0, 1, .45);    /* salidas */
-
-  --ox-t-1: 110ms;   /* hover, color */
-  --ox-t-2: 180ms;   /* el default */
-  --ox-t-3: 280ms;   /* entradas de overlay */
-  --ox-t-4: 420ms;   /* transiciones de vista */
-  /* Lo que se va en su lugar: el valor viejo de un relevo, la fila que sale de
-     una lista. Más corto que cualquier entrada (lo que se va ya no importa) y
-     más largo que un hover: con alguien esperando detrás, tiene que bajar
-     parejo. Es una sola perilla para las salidas; antes eran 150 ms escritos a
-     mano en el CSS y en motion.js. Los overlays chicos salen con --ox-t-1. */
+  /* ── Movimiento ────────────────────────────────────────────────────────── */
+  --ox-ease:      cubic-bezier(.16, 1, .3, 1);
+  --ox-ease-soft: cubic-bezier(.33, 1, .68, 1);
+  --ox-ease-both: cubic-bezier(.65, 0, .35, 1);
+  --ox-ease-in:   cubic-bezier(.55, 0, 1, .45);
+  --ox-t-1: 120ms;
+  --ox-t-2: 200ms;
+  --ox-t-3: 320ms;
+  --ox-t-4: 420ms;
   --ox-t-out: 150ms;
 
-  /* Transiciones nombradas: se componen, nunca se escribe `transition: all`
-     (que anima propiedades que no querías y cuesta caro en repaints).
-     El blur NO se anima nunca: es la propiedad más cara del sistema. */
   --tr-color:   color var(--ox-t-1) var(--ox-ease-soft),
                 background-color var(--ox-t-1) var(--ox-ease-soft),
                 box-shadow var(--ox-t-1) var(--ox-ease-soft);
@@ -275,13 +180,31 @@
                 box-shadow var(--ox-t-2) var(--ox-ease),
                 transform var(--ox-t-2) var(--ox-ease);
 
-  /* ── Geometría del layout ──────────────────────────────────────────────── */
-  --ox-titlebar:  38px;
-  --ox-statusbar: 26px;
-  --ox-rail:     224px;
-  --ox-inspector: 320px;
+  /* ── Geometría ─────────────────────────────────────────────────────────── */
+  --ox-titlebar: 34px;
+  --fw-tape:     30px;
+  --fw-cmd:      42px;
+  --ox-statusbar: 30px;     /* la barra de teclas de función */
+  --ox-fade: 22px;
 
-  /* Tamaño del esfumado donde el scroll recorta. El contenedor lleva padding
-     ≥ este valor en el eje del scroll para que en reposo no coma ningún ítem. */
-  --ox-fade: 28px;
+  /* ── La marca: la F de píxel en cuatro escalones de ámbar ─────────────────
+     a, 2 y 3 son los brazos; 4 es la cola del stem. En hex (para el ícono y
+     el splash, que no ven tokens): TONOS_HEX de fin/mark.js. */
+  --fw-mark-a: rgb(var(--ox-accent-rgb));
+  --fw-mark-2: oklch(64% .12 72);
+  --fw-mark-3: oklch(48% .1 72);
+  --fw-mark-4: oklch(38% .08 72);
+
+  /* ── El filtro CRT ─────────────────────────────────────────────────────────
+     Lo prende Ajustes (data-crt en <html>). Las líneas son sombra: oscurecen
+     1 de cada 3 renglones de pixeles. --fw-scan-px lo calibra app.js al
+     devicePixelRatio de la pantalla, para que con la escala de Windows en
+     125 % no caigan entre dos pixeles y salgan desparejas. */
+  --fw-scan-px: 1px;
+  --fw-scan: 0;
+  --fw-vig: 0;
+  --fw-glow: 0;
 }
+
+:root[data-crt='suave']  { --fw-scan: .22; --fw-vig: .32; --fw-glow: .35; }
+:root[data-crt='fuerte'] { --fw-scan: .38; --fw-vig: .5;  --fw-glow: .6; }
