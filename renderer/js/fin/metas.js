@@ -129,7 +129,7 @@ function cuerpoHTML(meta, { nuevos = [] } = {}) {
           ? `<button class="fw-meta__todos" data-accion="todos">${abierta ? 'VER MENOS' : `VER ${sobran} MÁS`}</button>` : ''}</div>
         <ul class="ox-copyable">${lista.map((a) => aporteHTML(a, nuevos.includes(a.id))).join('')}</ul>
       </div>` : ''}
-      <div class="fw-meta__form">
+      <div class="fw-meta__form" inert>
         <div>
           <input class="fw-fld fw-fld--num" data-f="monto" placeholder="monto" inputmode="decimal" spellcheck="false" autocomplete="off">
           <input class="fw-fld" data-f="nota" placeholder="nota (opcional)" maxlength="80" spellcheck="false" autocomplete="off">
@@ -270,6 +270,7 @@ function repintarMeta(meta, { nuevos = [] } = {}) {
 function abrirForm(card, meta, signo) {
   const f = card.querySelector('.fw-meta__form');
   f.dataset.signo = String(signo);
+  f.inert = false;
   f.classList.add('is-open');
   card.querySelectorAll('[data-accion="aportar"], [data-accion="retirar"]').forEach((b) =>
     b.classList.toggle('is-on', Number(b.dataset.accion === 'aportar' ? 1 : -1) === signo));
@@ -282,6 +283,9 @@ function abrirForm(card, meta, signo) {
 function cerrarForm(card) {
   const f = card.querySelector('.fw-meta__form');
   f.classList.remove('is-open');
+  // Cerrado mide 0px pero sus campos seguían a un Tab de distancia: el foco
+  // caía en algo invisible. `inert` los saca del recorrido hasta que se abra.
+  f.inert = true;
   card.querySelectorAll('.fw-meta__act .fw-btn').forEach((b) => b.classList.remove('is-on'));
   f.querySelectorAll('input').forEach((i) => { i.value = ''; i.classList.remove('is-invalid'); i.blur(); });
 }

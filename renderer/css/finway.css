@@ -266,13 +266,23 @@
 /* ══ F4 Metas ════════════════════════════════════════════════════════════════ */
 .fw-met { grid-template-rows: auto minmax(0, 1fr); }
 .fw-met__tot { grid-column: 1 / -1; }
-.fw-met__grilla { grid-column: 1 / -1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(300px, auto); gap: 10px; align-content: start; }
+/* El padding con su margen negativo es aire para el anillo de foco (3.5px por
+   fuera) de lo que toca el borde, como la tarjeta de «nueva meta»: sin él, el
+   scroll de la grilla le comía el lado de abajo y el de la izquierda. El
+   scroll-padding hace lo mismo cuando Tab trae una tarjeta al borde. */
+.fw-met__grilla { grid-column: 1 / -1; min-height: 0; overflow-y: auto; padding: 4px; margin: -4px; scroll-padding: 4px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(min-content, auto); gap: 10px; align-content: start; }
 .fw-met__vacio { grid-column: 1 / -1; min-height: 260px; }
 .fw-met__nueva { min-height: 300px; }
 .fw-met__ficha.is-done .fw-p__n { color: var(--fw-in); }
 .fw-stamp { padding: 0 7px; border-radius: 3px; font-size: 12px; letter-spacing: .14em; color: var(--fw-in); box-shadow: inset 0 0 0 1px var(--fw-in); }
-.fw-meta__box { height: 100%; }
-.fw-meta { padding: 12px 14px; height: 100%; display: flex; flex-direction: column; gap: 8px; }
+/* La fila mide lo que pide su ficha más alta (min-content), con un piso de
+   300px que pone la ficha misma (28 de cabecera + 272). Con la fila fija en
+   300 y la grilla llena, abrir el formulario de aporte no la hacía crecer: la
+   lista de aportes se aplastaba a cero, encimada sobre el formulario, y los
+   botones de abajo quedaban cortados por el panel. */
+.fw-met__ficha > .fw-p__b { flex: 1 0 auto; }
+.fw-meta__box { flex: 1; display: flex; flex-direction: column; }
+.fw-meta { padding: 12px 14px; flex: 1; min-height: 272px; display: flex; flex-direction: column; gap: 8px; }
 .fw-meta__amt { font-size: 30px; line-height: 1; white-space: nowrap; }
 .fw-meta__amt small { font-size: 16px; color: var(--ox-text-3); margin-left: 6px; }
 .fw-meta__pct { display: flex; justify-content: space-between; font-size: 12px; letter-spacing: .1em; color: var(--ox-text-3); margin-top: 5px; }
@@ -292,7 +302,12 @@
 .fw-meta__form { display: grid; grid-template-rows: 0fr; margin-top: auto; transition: grid-template-rows var(--ox-t-3) var(--ox-ease); }
 .fw-meta__form > * { overflow: hidden; }
 .fw-meta__form.is-open { grid-template-rows: 1fr 1fr; }
-.fw-meta__form > div:first-child { display: flex; gap: 6px; align-items: center; padding: 1px; }
+/* 3px de aire: el halo del campo enfocado (3px por fuera) entra entero en el
+   recorte del despliegue; el margen negativo le devuelve el ancho. El de
+   arriba y abajo crece con el despliegue: cerrado, un padding es un alto que
+   el 0fr no puede achicar y asomaría una franja del formulario. */
+.fw-meta__form > div:first-child { display: flex; gap: 6px; align-items: center; padding: 0 3px; margin-inline: -2px; transition: padding var(--ox-t-3) var(--ox-ease); }
+.fw-meta__form.is-open > div:first-child { padding-block: 3px; }
 .fw-meta__form .fw-fld[data-f='monto'] { width: 110px; }
 .fw-meta__form .fw-fld[data-f='nota'] { flex: 1; }
 .fw-meta__hint { font-size: 11.5px; letter-spacing: .06em; color: var(--ox-text-3); padding-top: 3px; transition: color var(--ox-t-2); }

@@ -402,6 +402,62 @@ app.whenReady().then(async () => {
     })()`));
   }
   ok('cero emojis y cero flechas o triángulos unicode, en las seis pantallas', glifos.length === 0, [...new Set(glifos)].join(' | '));
+
+  /* El anillo de foco va por fuera del control (offset + trazo). Si un
+     ancestro que recorta (overflow, clip-path) o el borde de la ventana le
+     queda más cerca, se pierde un lado: pasó con las teclas F, al pie de la
+     ventana. Se recorre cada pantalla con Tab, como con el teclado, y se mide
+     dónde CAE el anillo contra cada recorte. La ventana de prueba no tiene el
+     foco del sistema, y sin él no hay :focus-visible: se emula. */
+  win.webContents.debugger.attach('1.3');
+  await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true });
+  const anilloCortado = `(() => {
+    let el = document.activeElement;
+    if (!el || el === document.body || !el.matches(':focus-visible')) return null;
+    const foco = el;
+    let s = getComputedStyle(el);
+    if (s.outlineStyle === 'none') {   // un scroller le pasa el anillo a su panel
+      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        const as = getComputedStyle(a);
+        if (as.outlineStyle !== 'none') { el = a; s = as; break; }
+      }
+    }
+    if (s.outlineStyle === 'none') return null;
+    const ext = parseFloat(s.outlineOffset) + parseFloat(s.outlineWidth);
+    const r = el.getBoundingClientRect();
+    const ring = { l: r.left - ext, t: r.top - ext, r: r.right + ext, b: r.bottom + ext };
+    const nombre = foco.id ? '#' + foco.id : (foco.getAttribute('aria-label') || foco.textContent.trim().slice(0, 20) || foco.className);
+    if (ring.l < 0 || ring.t < 0 || ring.r > innerWidth || ring.b > innerHeight) return nombre + ' (borde de la ventana)';
+    for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+      const as = getComputedStyle(a);
+      const x = as.overflowX !== 'visible' || as.clipPath !== 'none', y = as.overflowY !== 'visible' || as.clipPath !== 'none';
+      if (!x && !y) continue;
+      const b = a.getBoundingClientRect();
+      if ((x && (ring.l < b.left - .01 || ring.r > b.right + .01)) || (y && (ring.t < b.top - .01 || ring.b > b.bottom + .01)))
+        return nombre + ' (lo recorta ' + (a.id ? '#' + a.id : '.' + [...a.classList].join('.')) + ')';
+    }
+    return null;
+  })()`;
+  const cortados = [];
+  let recorridos = 0;
+  for (let i = 1; i <= 6; i++) {
+    await tecla(`F${i}`);
+    await sleep(700);
+    await js(`document.activeElement?.blur()`);
+    const vistos = new Set();
+    for (let n = 0; n < 80; n++) {
+      await tecla('Tab');
+      await sleep(30);
+      const id = await js(`(() => { const e = document.activeElement; const r = e.getBoundingClientRect(); return e.tagName + e.className + Math.round(r.x) + ',' + Math.round(r.y); })()`);
+      if (vistos.has(id)) break;
+      vistos.add(id);
+      recorridos++;
+      const corte = await js(anilloCortado);
+      if (corte) cortados.push(`F${i} ${corte}`);
+    }
+  }
+  win.webContents.debugger.detach();
+  ok(`ningún anillo de foco cortado (${recorridos} paradas de Tab en las seis pantallas)`, recorridos > 30 && cortados.length === 0, [...new Set(cortados)].join(' | '));
   ok('sin errores ni warnings del renderer', errores.length === 0, errores.slice(0, 6).join(' | '));
 
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* lo tiene Electron */ }

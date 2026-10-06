@@ -233,6 +233,7 @@ function wireDatePicker(qa) {
   const layer = () => document.getElementById('ox-layer');
   let viewYM = S.date.slice(0, 7);
   let onDoc = null;
+  let onFoco = null;
   let pop = null;
 
   const place = () => {
@@ -250,8 +251,10 @@ function wireDatePicker(qa) {
     if (!pop) return;
     fieldBtn.classList.remove('is-on');
     document.removeEventListener('mousedown', onDoc);
+    document.removeEventListener('focusin', onFoco);
     window.removeEventListener('resize', place);
     onDoc = null;
+    onFoco = null;
     exit(pop, { fallback: 260 });
     pop = null;
   };
@@ -281,6 +284,10 @@ function wireDatePicker(qa) {
     onDoc = (e) => { if (!pop.contains(e.target) && !fieldBtn.contains(e.target)) close(); };
     // En el mismo tick, el click que abre llegaría al documento y cerraría.
     setTimeout(() => document.addEventListener('mousedown', onDoc), 0);
+    /* Con Tab el foco se va al campo de al lado, que queda DEBAJO del
+       calendario: su anillo no se veía. Si el foco sale, el calendario se va. */
+    onFoco = (e) => { if (!pop.contains(e.target) && !fieldBtn.contains(e.target)) close(); };
+    document.addEventListener('focusin', onFoco);
     window.addEventListener('resize', place);
   };
 

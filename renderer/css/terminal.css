@@ -42,6 +42,10 @@
 .fw-p__m { margin-left: auto; min-width: 0; font-size: 11.5px; color: var(--ox-text-3); letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
 .fw-p__h > .fw-seg, .fw-p__h > .fw-btn, .fw-p__h > .fw-iconbtn { flex: none; }
 .fw-p__h > .fw-p__m + .fw-seg, .fw-p__h > .fw-p__m + .fw-btn { margin-left: 8px; }
+/* La cabecera mide 28px y sus botones 24–26: el anillo de afuera (2px de aire
+   + 1.5 de trazo) se saldría del panel, que recorta. Acá va por dentro, sobre
+   el canto del propio control. */
+.fw-p__h :focus-visible { outline-offset: -1.5px; }
 .fw-p__b { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
 
 /* La barra de herramientas de adentro de un panel */
@@ -57,6 +61,13 @@
    la línea de la cabecera y abajo el borde del panel, así que no lleva
    esfumado ni el respiro que el esfumado pide (ox-scroll--line-*). */
 .ox-scroll.fw-scroll { padding-top: 0; padding-bottom: 0; }
+/* Chromium deja enfocar con Tab lo que scrollea (para moverlo con flechas).
+   El anillo no puede ir en el scroller: ocupa el panel de lado a lado y el
+   panel recorta (por fuera se pierde), y por dentro lo tapa el `th` sticky de
+   la tabla, que pinta encima. Lo lleva el panel entero, que tiene aire
+   alrededor: «el foco está en esta lista». */
+.fw-scroll:focus-visible { outline: none; }
+.fw-p:has(> .fw-p__b > .fw-scroll:focus-visible) { outline: 1.5px solid var(--ox-ring); outline-offset: 2px; }
 
 /* ── Botones ───────────────────────────────────────────────────────────────────
    Una tecla y lo que hace: `[E] EDITAR`. El primario es el mismo en ámbar. */
