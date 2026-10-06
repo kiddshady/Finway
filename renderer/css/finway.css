@@ -177,19 +177,20 @@
 .fw-trend.is-none .fw-trend__tick { opacity: 0; }
 .fw-trend__hair { opacity: 0; transition: opacity var(--ox-t-1) var(--ox-ease-soft); }
 #trend-svg.is-hover .fw-trend__hair { opacity: 1; }
+/* Portaleado a #ox-layer (trend.js): adentro del panel lo recortaba su
+   overflow:hidden cuando la ventana es baja. */
 .fw-trend__tip {
-  position: absolute; top: 6px; left: var(--tip-x, 0);
+  position: absolute; top: 0; left: 0;
   min-width: 190px; padding: 8px 10px;
   border-radius: var(--ox-r-md);
   background: var(--ox-s3);
   box-shadow: inset 0 0 0 1px var(--ox-line-2), var(--ox-e3);
-  font-size: 13px; pointer-events: none;
-  opacity: 0; transform: translate(0, 4px);
-  transition: opacity var(--ox-t-2) var(--ox-ease-soft), transform var(--ox-t-2) var(--ox-ease), left .22s var(--ox-ease);
+  font-size: 13px;
+  opacity: 0; transform: translateY(4px);
+  transition: opacity var(--ox-t-2) var(--ox-ease-soft), transform var(--ox-t-2) var(--ox-ease), left .22s var(--ox-ease), top .22s var(--ox-ease);
 }
-.fw-trend__tip.is-left { transform: translate(-100%, 4px); }
-.fw-trend__tip.is-open { opacity: 1; transform: translate(0, 0); }
-.fw-trend__tip.is-left.is-open { transform: translate(-100%, 0); }
+#ox-layer > .fw-trend__tip { pointer-events: none; }
+.fw-trend__tip.is-open { opacity: 1; transform: none; }
 .fw-trend__tip-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
 .fw-readout__label { color: var(--ox-accent); letter-spacing: .1em; }
 .fw-trend__tip-total { margin-left: auto; color: var(--ox-text); }

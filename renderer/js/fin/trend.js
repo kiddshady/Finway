@@ -26,6 +26,12 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
 const TW = 960, TH = 250, TL = 56, TR = 20, TT = 16, TB = 30;
 const TIW = TW - TL - TR, TIH = TH - TT - TB;
 const TICKS = [0.25, 0.5, 0.75, 1];
+const EDGE = 10;     // margen mínimo del tooltip contra el borde de la ventana
+
+/* El tooltip es uno solo para toda la app y vive en #ox-layer. Cada cableado
+   nuevo se lo queda: si el viejo quedó abierto (la card se repintó con el
+   mouse encima), se cierra acá en vez de quedar flotando huérfano. */
+let tipVivo = null;
 
 /** Geometría para una selección: la escala sale SOLO de las prendidas, así
     una categoría chica elegida sola ocupa todo el alto y se le ve la forma. */
@@ -91,7 +97,6 @@ export function trendHTML(trend, sel) {
           ${lines}
           ${months}
         </svg>
-        <div class="fw-trend__tip" id="trend-tip"></div>
         <div class="fw-trend__none${anyOn(trend, sel) ? '' : ' is-open'}" id="trend-none">elegí una o más categorías</div>
       </div>
     </div>`;
@@ -108,7 +113,13 @@ export function wireTrend(root, trend, sel, onPick) {
   if (!box) return;
   const svg = box.querySelector('#trend-svg');
   const stage = box.querySelector('.fw-trend__stage');
-  const tip = box.querySelector('#trend-tip');
+  if (!tipVivo?.isConnected) {
+    tipVivo = document.createElement('div');
+    tipVivo.className = 'fw-trend__tip';
+    document.getElementById('ox-layer').appendChild(tipVivo);
+  }
+  const tip = tipVivo;
+  tip.classList.remove('is-open');
   const hair = box.querySelector('#trend-hair');
   const none = box.querySelector('#trend-none');
   const allBtn = box.querySelector('#trend-all');
@@ -183,7 +194,9 @@ export function wireTrend(root, trend, sel, onPick) {
 
   /* El tooltip del mes: cuánto gastó cada categoría prendida, de mayor a
      menor, y el total si hay más de una. Flota al lado de la línea vertical,
-     del lado donde hay lugar. */
+     del lado donde hay lugar, y siempre adentro de la ventana: vive en
+     #ox-layer porque adentro del panel (overflow:hidden) se cortaba cuando la
+     ventana es baja y el gráfico mide menos que el cartel. */
   const showTip = (i) => {
     const on = trend.series.filter((s) => sel.has(s.cat));
     if (!on.length) return hideTip();
@@ -201,11 +214,25 @@ export function wireTrend(root, trend, sel, onPick) {
           <span class="fw-trend__tip-amount">${fmtARS(s.values[i])}</span>
         </div>`).join('')}`;
 
-    const w = svg.getBoundingClientRect().width;
-    const px = (g.x(i) / TW) * w;
-    const right = px < w * 0.6;
-    tip.style.setProperty('--tip-x', `${(right ? px + 14 : px - 14).toFixed(1)}px`);
-    tip.classList.toggle('is-left', !right);
+    const r = svg.getBoundingClientRect();
+    const px = r.left + (g.x(i) / TW) * r.width;
+    const tw = tip.offsetWidth;
+    const th = tip.offsetHeight;
+    const x = px < r.left + r.width * 0.6 ? px + 14 : px - 14 - tw;
+    const left = Math.min(Math.max(EDGE, x), window.innerWidth - tw - EDGE);
+    const top = Math.min(Math.max(EDGE, r.top + 6), window.innerHeight - th - EDGE);
+    // Recién abierto se planta en su lugar sin viajar: el left/top que traía
+    // es el de la última vez (u otra card), y deslizarse desde ahí es ruido.
+    const abriendo = !tip.classList.contains('is-open') || tip.__dueno !== stage;
+    tip.__dueno = stage;
+    if (abriendo) tip.style.transition = 'none';
+    tip.style.left = `${left.toFixed(1)}px`;
+    tip.style.top = `${top.toFixed(1)}px`;
+    if (abriendo) {
+      void tip.offsetWidth;
+      tip.style.transition = '';
+      document.addEventListener('pointermove', huerfano);
+    }
     tip.classList.add('is-open');
 
     hair.setAttribute('x1', g.x(i).toFixed(1));
@@ -213,7 +240,16 @@ export function wireTrend(root, trend, sel, onPick) {
     svg.classList.add('is-hover');
     svg.querySelectorAll('.fw-trend__pt').forEach((p) => p.classList.toggle('is-hot', Number(p.dataset.i) === i));
   };
+  // Si la card se repinta con el mouse encima no llega ningún mouseleave: el
+  // primer movimiento después se da cuenta y cierra el cartel, salvo que ya
+  // lo haya agarrado la card nueva.
+  const huerfano = () => {
+    if (stage.isConnected) return;
+    document.removeEventListener('pointermove', huerfano);
+    if (tip.__dueno === stage) tip.classList.remove('is-open');
+  };
   const hideTip = () => {
+    document.removeEventListener('pointermove', huerfano);
     tip.classList.remove('is-open');
     svg.classList.remove('is-hover');
     svg.querySelectorAll('.fw-trend__pt.is-hot').forEach((p) => p.classList.remove('is-hot'));
