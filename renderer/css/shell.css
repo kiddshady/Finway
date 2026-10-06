@@ -92,7 +92,6 @@
   padding: 0 22px;
   font-size: 12.5px;
   white-space: nowrap;
-  box-shadow: inset -1px 0 0 var(--ox-line);
 }
 .fw-tape__k { color: var(--ox-text-3); letter-spacing: .1em; }
 .fw-tape__v { color: var(--ox-text); }
