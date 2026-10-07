@@ -54,17 +54,29 @@
   border: 0;
   background: transparent;
   color: var(--ox-text-3);
-  transition: background-color var(--ox-t-1) var(--ox-ease-soft), color var(--ox-t-1) var(--ox-ease-soft);
+  transition: color var(--ox-t-1) var(--ox-ease-soft);
 }
-.ox-wincontrol:hover { background: rgb(255 232 196 / .05); color: var(--ox-text); }
-.ox-wincontrol--close:hover { background: var(--ox-danger-dim); color: #fff; }
-/* El anillo va 4px adentro de la celda, redondeado, y lo dibuja un ::after:
-   pegado al borde, la esquina redondeada que Windows 11 le pone a la ventana
-   (8px) se comía el ángulo del de cerrar. Con 4px de aire y 4 de radio queda
-   concéntrico con esa esquina. No es un outline porque, con offset negativo,
-   Chromium le achica el radio a cero; y el radio en el botón redondearía
-   también el fondo del hover, que va a sangre. */
+/* El fondo del hover y el anillo de foco ocupan la misma caja: 4px adentro de
+   la celda, redondeada. Pegada al borde, la esquina redondeada que Windows 11
+   le pone a la ventana (8px) se comía el ángulo del de cerrar; con 4px de aire
+   y 4 de radio queda concéntrica con esa esquina. La celda entera sigue siendo
+   clickeable (44px de ancho, alto completo): solo se achica lo que se ve.
+   El fondo es un ::before y el anillo un ::after; no son outline porque, con
+   offset negativo, Chromium le achica el radio a cero. */
 .ox-wincontrol { position: relative; }
+.ox-wincontrol::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: var(--ox-r-sm);
+  background: transparent;
+  transition: background-color var(--ox-t-1) var(--ox-ease-soft);
+  pointer-events: none;
+}
+.ox-wincontrol:hover { color: var(--ox-text); }
+.ox-wincontrol:hover::before { background: rgb(255 232 196 / .05); }
+.ox-wincontrol--close:hover { color: #fff; }
+.ox-wincontrol--close:hover::before { background: var(--ox-danger-dim); }
 .ox-wincontrol::after {
   content: '';
   position: absolute;
@@ -76,7 +88,8 @@
 }
 .ox-wincontrol:focus-visible { outline: none; }
 .ox-wincontrol:focus-visible::after { opacity: 1; }
-.ox-wincontrol .ox-icon { width: 11px; height: 11px; stroke-width: 1.2; }
+/* Relativo para quedar por encima del fondo del ::before. */
+.ox-wincontrol .ox-icon { position: relative; width: 11px; height: 11px; stroke-width: 1.2; }
 
 /* ── Cinta de cotizaciones ─────────────────────────────────────────────────────
    Las cifras del mes pasando de derecha a izquierda. La pista lleva el
