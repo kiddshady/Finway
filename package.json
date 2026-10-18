@@ -23,7 +23,7 @@
     "release": "electron-builder --win --publish always"
   },
   "devDependencies": {
-    "electron": "40.10.2",
+    "electron": "44.5.1",
     "electron-builder": "^26.15.3"
   },
   "build": {

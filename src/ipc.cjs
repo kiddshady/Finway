@@ -55,8 +55,9 @@ function register() {
   handle('doc:write', (name, data) => store.doc(name).write(data).then(() => true));
 
   /* navigator.clipboard se niega a escribir si la ventana no tiene el foco;
-     el portapapeles del sistema, desde acá, no pide nada. */
-  handle('clipboard:write', (text) => { clipboard.writeText(String(text)); return true; });
+     el portapapeles del sistema, desde acá, no pide nada. Desde Electron 44
+     el del proceso principal es asíncrono, como el de la web. */
+  handle('clipboard:write', async (text) => { await clipboard.writeText(String(text)); return true; });
 
   handle('col:list', (name) => coll(name).list());
   handle('col:get', (name, id) => coll(name).get(id));
