@@ -9,7 +9,7 @@
 import { Icons } from '../icons.js';
 import { Modal, Toast } from '../overlays.js';
 import Router from '../router.js';
-import { frase, swap } from '../motion.js';
+import { frase, roll, swap } from '../motion.js';
 import { esc, paint, path as recortar, viewEl } from '../ui.js';
 import { exportAll, importBackup, S } from './state.js';
 import { resumenCalculadora } from './calculadora.js';
@@ -125,13 +125,25 @@ export function viewAjustes() {
   Router.onLeave(Update.onChange((e) => pintarUpdate(root, e)));
 }
 
-/* El estado es una frase: un cambio de fase hace relevo. El botón no se
-   rehace en cada aviso: si es el mismo, solo se prende o se apaga. */
+/* El estado es una frase: un cambio de fase hace relevo. Mientras baja, el
+   porcentaje corre suave (roll) y sin destello: destellaba en cada aviso,
+   varias veces por segundo, y cada destello arrancaba antes de que terminara
+   el anterior —el número se prendía y apagaba sin parar, como un bug—. El
+   botón no se rehace en cada aviso: si es el mismo, solo se prende o se
+   apaga. */
 function pintarUpdate(root, e) {
   const estado = root.querySelector('#aj-update-estado');
   const foot = root.querySelector('#aj-update-foot');
   if (!estado || !foot) return;
-  frase(estado, esc(Update.describir(e).toUpperCase()));
+  if (e.state === 'downloading') {
+    roll(estado, e.percent ?? 0, (p) =>
+      frase(estado, esc(Update.describir({ ...e, percent: Math.round(p) }).toUpperCase()), { destello: false }));
+  } else {
+    // Fuera de la descarga la carrera se corta: si no, un cuadro en vuelo
+    // volvía a escribir «BAJANDO…» sobre la fase nueva.
+    if (estado.__roll) { cancelAnimationFrame(estado.__roll.raf); estado.__roll = null; }
+    frase(estado, esc(Update.describir(e).toUpperCase()));
+  }
   const ocupado = e.state === 'checking' || e.state === 'downloading';
   const boton = e.state === 'ready' ? `instalar:${e.version}` : 'buscar';
   if (foot.dataset.boton !== boton) {

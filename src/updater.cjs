@@ -88,8 +88,8 @@ async function buscar() {
 /** Cierra la app e instala. Solo hace algo si la descarga ya terminó. */
 function instalar() {
   if (estado.state !== 'ready') return;
-  // isSilent:false → el NSIS muestra su progreso; isForceRunAfter:true → vuelve a abrir.
-  autoUpdater.quitAndInstall(false, true);
+  // isSilent:true → el NSIS instala sin mostrar ventana; isForceRunAfter:true → vuelve a abrir.
+  autoUpdater.quitAndInstall(true, true);
 }
 
 function actual() {

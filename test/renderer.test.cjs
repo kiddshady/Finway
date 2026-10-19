@@ -140,6 +140,28 @@ app.whenReady().then(async () => {
       && (await js(`document.getElementById('crumb-view').textContent.trim()`)) === pantallas[i].toUpperCase());
   }
   ok('en Ajustes las migas no muestran mes', await js(`document.getElementById('crumb').classList.contains('is-sin-mes')`));
+
+  /* El % de la descarga corre suave y sin destello: destellaba en cada aviso
+     y, varias veces por segundo, se prendía y apagaba sin parar. Los estados
+     se fabrican por el mismo canal que usa el main. */
+  const previo = await js(`import('./js/update.js').then((m) => m.estado)`);
+  win.webContents.send('update:status', { state: 'downloading', version: '9.9.9', percent: 10 });
+  await sleep(500);
+  win.webContents.send('update:status', { state: 'downloading', version: '9.9.9', percent: 60 });
+  const pctUpd = await js(`(async () => {
+    const el = document.getElementById('aj-update-estado');
+    const vistos = []; let destello = false; const t0 = performance.now();
+    while (performance.now() - t0 < 600) {
+      const m = el?.textContent.match(/(\\d+)%/); if (m) vistos.push(+m[1]);
+      if (el?.classList.contains('ox-ticked')) destello = true;
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    return { vistos: [...new Set(vistos)], destello, dice: el?.textContent };
+  })()`);
+  win.webContents.send('update:status', previo);
+  await sleep(400);
+  ok('el % de la descarga corre de a poco hasta el nuevo, sin destello',
+    !pctUpd.destello && pctUpd.vistos.some((v) => v > 10 && v < 60) && pctUpd.vistos.at(-1) === 60, JSON.stringify(pctUpd));
   await click('.fw-fk__b[data-view="resumen"]');
   await sleep(650);
   ok('un clic en la tecla también navega', (await vista()) === 'resumen');
