@@ -13,6 +13,7 @@ import { colorToken, paint } from './ui.js';
 import { relTime } from './format.js';
 import { catLabel } from './fin/categories.js';
 import { currentMonth, monthLabel, shiftMonth } from './fin/format.js';
+import { Dia, seguirMes } from './fin/dia.js';
 import { markSVG } from './fin/mark.js';
 import { byCategory, monthTotals, movesOf } from './fin/stats.js';
 import { loadAll, refresh, S, setOnChrome, setOnSaved } from './fin/state.js';
@@ -108,11 +109,24 @@ function pintarCinta() {
   setTimeout(() => { poner(); raf2(() => pista.classList.remove('is-out')); }, 170);
 }
 
-/** El reloj de la titlebar: la terminal sabe qué hora es. */
+/** El reloj de la titlebar: la terminal sabe qué hora es. Y de paso, qué día:
+    si pasó la medianoche, el vigía avisa (fin/dia.js). */
 function reloj() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, '0');
   document.getElementById('clock').innerHTML = `${p(d.getHours())}:${p(d.getMinutes())}<span>:${p(d.getSeconds())}</span>`;
+  Dia.revisar();
+}
+
+/* Día nuevo: el mes en pantalla lo sigue solo si era el mes en curso (uno
+   viejo que se estaba mirando se queda), y la vista se rehace para que «hoy»
+   (el día marcado, el drenaje por día) cuente desde el día nuevo. La fecha del
+   formulario la sigue fin/formulario.js. */
+function alCambiarDia(cambio) {
+  const mes = seguirMes(S.month, cambio);
+  if (mes !== S.month) { irAMes(mes); return; }
+  Router.refresh();
+  updateChrome();
 }
 
 /** Cuando algo se guarda, la marca late y el punto de GUARDADO destella: el
@@ -191,6 +205,8 @@ function wireShell() {
   /* Al recuperar el foco, releer del disco: una ventana que durmió en el tray
      se pone al día sola. Solo si algo cambió. */
   window.addEventListener('focus', async () => {
+    // Primero el día: con la ventana en el tray el reloj anda frenado.
+    Dia.revisar();
     if (!await refresh()) return;
     Router.refresh();
     updateChrome();
@@ -242,6 +258,7 @@ async function boot() {
   Router.onChange(() => Menu.close());
   Router.go('resumen');
   updateChrome();
+  Dia.alCambiar(alCambiarDia);
 
   // El splash se va recién cuando ya hay algo pintado debajo.
   raf2(() => {

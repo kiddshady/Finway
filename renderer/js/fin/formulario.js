@@ -13,8 +13,17 @@ import { catLabel } from './categories.js';
 import { fmtARS } from './format.js';
 import { QuickAdd, quickAddHTML, syncQuickAdd, wireQuickAdd } from './quickadd.js';
 import { saveMove } from './state.js';
+import { Dia } from './dia.js';
 
 let abierto = false;
+let cuerpo = null;   // el del modal mientras está abierto
+
+/* Pasó la medianoche: la fecha que estaba en «hoy» pasa al día nuevo, también
+   con el formulario abierto (se pone al día en el lugar). La que se eligió a
+   mano se queda. */
+Dia.alCambiar((cambio) => {
+  if (QuickAdd.seguirDia(cambio) && cuerpo) syncQuickAdd(cuerpo);
+});
 
 /** `move`: el movimiento a editar, o null para uno nuevo. Resuelve cuando se
     cierra (guardado o cancelado). */
@@ -27,6 +36,7 @@ export async function abrirFormulario(move = null) {
   const body = document.createElement('div');
   body.className = 'fw-formmov';
   body.innerHTML = quickAddHTML();
+  cuerpo = body;
 
   const esperando = Modal.show({
     title: move ? 'Editar movimiento' : 'Nuevo movimiento',
@@ -53,6 +63,7 @@ export async function abrirFormulario(move = null) {
   setTimeout(() => QuickAdd.focusAmount(body), 80);
 
   await esperando;
+  cuerpo = null;
   soltar?.();
   // Cancelar una edición no puede dejar el formulario «editando» para la próxima.
   if (QuickAdd.editing) QuickAdd.reset();

@@ -480,6 +480,42 @@ app.whenReady().then(async () => {
   }
   win.webContents.debugger.detach();
   ok(`ningún anillo de foco cortado (${recorridos} paradas de Tab en las seis pantallas)`, recorridos > 30 && cortados.length === 0, [...new Set(cortados)].join(' | '));
+
+  console.log('\n13. Abierta de un día al otro');
+  /* El reloj de la página se adelanta (se reemplaza su Date): la medianoche se
+     simula, no se espera. Se salta al 1.º del mes que viene, así pasan de una
+     el día y el mes. */
+  const dmy = (d) => ymd(d).split('-').reverse().join('/');
+  const primeroQueViene = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1, 10, 0);
+  const otroDia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 2, 10, 0);
+  const adelantarA = (d) => js(`(() => { const R = window.__DateReal || Date; window.__DateReal = R;
+    const off = ${d.getTime()} - R.now();
+    window.Date = class extends R { constructor(...a) { if (a.length) super(...a); else super(R.now() + off); } static now() { return R.now() + off; } };
+  })()`);
+  const fechaForm = () => js(`document.getElementById('qa-dp-value')?.textContent || ''`);
+  const crumbMes = () => js(`document.getElementById('crumb-mes')?.textContent || ''`);
+  await tecla('F1'); await sleep(700);
+  await tecla('Home'); await sleep(700);
+  await js(`import('./js/fin/quickadd.js').then((m) => m.QuickAdd.reset())`);
+  await tecla('n', ['control']); await sleep(700);
+  ok('el formulario arranca en hoy', (await fechaForm()) === dmy(hoy), await fechaForm());
+  await adelantarA(primeroQueViene);
+  await sleep(1800);
+  ok('pasada la medianoche, la fecha del formulario abierto pasa al día nuevo', (await fechaForm()) === dmy(primeroQueViene), await fechaForm());
+  const mesNuevo = primeroQueViene.toLocaleString('es-AR', { month: 'long' }).toUpperCase();
+  ok('y el mes en pantalla, que era el en curso, pasa al nuevo', (await crumbMes()).includes(mesNuevo), `${await crumbMes()} / ${mesNuevo}`);
+  const elegida = `${ymd(primeroQueViene).slice(0, 7)}-15`;
+  await click('#qa-dp-field'); await sleep(450);
+  await click(`.fw-dp__day[data-date="${elegida}"]`); await sleep(500);
+  ok('se elige a mano otra fecha', (await fechaForm()) === elegida.split('-').reverse().join('/'), await fechaForm());
+  await adelantarA(otroDia);
+  await sleep(1800);
+  ok('otra medianoche no pisa la fecha elegida a mano', (await fechaForm()) === elegida.split('-').reverse().join('/'), await fechaForm());
+  await tecla('Escape'); await sleep(500);
+  ok('el modal se cierra sin guardar nada', !(await js(`!!document.querySelector('.ox-modal')`)) && !movs().some((m) => m.date === elegida));
+  await js(`window.Date = window.__DateReal; true`);
+  await sleep(1300);
+
   ok('sin errores ni warnings del renderer', errores.length === 0, errores.slice(0, 6).join(' | '));
 
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* lo tiene Electron */ }

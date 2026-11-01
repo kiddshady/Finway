@@ -14,6 +14,7 @@ import { bindSwitcher, exit, frase, swap } from '../motion.js';
 import { esc } from '../ui.js';
 import { catColor, catsFor } from './categories.js';
 import { parseAmount, todayStr, shiftMonth, daysInMonth } from './format.js';
+import { seguirDia } from './dia.js';
 
 const DOW = ['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO'];
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -396,6 +397,17 @@ export const QuickAdd = {
     S.amount = '';
     S.note = '';
     if (!keepDate) S.date = todayStr();
+  },
+
+  /** Pasó la medianoche (fin/dia.js): la fecha sigue al día nuevo solo si
+      estaba en «hoy». Una elegida a mano, o la de un movimiento que se está
+      editando, se queda. Devuelve si cambió. */
+  seguirDia(cambio) {
+    if (S.editing) return false;
+    const nueva = seguirDia(S.date, cambio);
+    if (nueva === S.date) return false;
+    S.date = nueva;
+    return true;
   },
 
   focusAmount(root = document) {
